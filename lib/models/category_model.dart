@@ -4,6 +4,10 @@ class CategoryModel {
   final String description;
   final String image;
 
+  /// Null/empty for a top-level category. When set, this category is a
+  /// subcategory nested under the category with this id.
+  final String? parentCategoryId;
+
   final int productCount;
   final int sortOrder;
 
@@ -17,12 +21,19 @@ class CategoryModel {
     required this.name,
     this.description = '',
     this.image = '',
+    this.parentCategoryId,
     this.productCount = 0,
     this.sortOrder = 0,
     this.isActive = true,
     this.createdAt,
     this.updatedAt,
   });
+
+  /// True for a top-level category (no parent).
+  bool get isTopLevel => parentCategoryId == null || parentCategoryId!.isEmpty;
+
+  /// True if this category is nested under another category.
+  bool get isSubcategory => !isTopLevel;
 
   factory CategoryModel.fromMap(
     Map<String, dynamic> map, {
@@ -33,6 +44,9 @@ class CategoryModel {
       name: map['name']?.toString() ?? '',
       description: map['description']?.toString() ?? '',
       image: map['image']?.toString() ?? '',
+      parentCategoryId: (map['parentCategoryId']?.toString().isEmpty ?? true)
+          ? null
+          : map['parentCategoryId'].toString(),
       productCount: _toInt(map['productCount']),
       sortOrder: _toInt(map['sortOrder']),
       isActive: map['isActive'] ?? true,
@@ -47,6 +61,7 @@ class CategoryModel {
       'name': name,
       'description': description,
       'image': image,
+      'parentCategoryId': parentCategoryId,
       'productCount': productCount,
       'sortOrder': sortOrder,
       'isActive': isActive,
@@ -60,6 +75,8 @@ class CategoryModel {
     String? name,
     String? description,
     String? image,
+    String? parentCategoryId,
+    bool clearParentCategoryId = false,
     int? productCount,
     int? sortOrder,
     bool? isActive,
@@ -71,6 +88,9 @@ class CategoryModel {
       name: name ?? this.name,
       description: description ?? this.description,
       image: image ?? this.image,
+      parentCategoryId: clearParentCategoryId
+          ? null
+          : (parentCategoryId ?? this.parentCategoryId),
       productCount: productCount ?? this.productCount,
       sortOrder: sortOrder ?? this.sortOrder,
       isActive: isActive ?? this.isActive,

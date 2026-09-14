@@ -6,6 +6,7 @@ class ProductModel {
   final String categoryId;
   final String categoryName;
   final String brand;
+  final String sku;
 
   final double price;
   final double? salePrice;
@@ -34,6 +35,7 @@ class ProductModel {
     required this.categoryId,
     required this.categoryName,
     this.brand = '',
+    this.sku = '',
     required this.price,
     this.salePrice,
     this.stock = 0,
@@ -64,6 +66,25 @@ class ProductModel {
   bool get isLowStock => stock > 0 && stock <= 5;
 
   String get thumbnail => images.isEmpty ? '' : images.first;
+  static List<String> _parseStringList(dynamic value) {
+    if (value == null) return [];
+
+    if (value is List) {
+      return value
+          .where((item) => item != null)
+          .map((item) => item.toString())
+          .toList();
+    }
+
+    if (value is Map) {
+      return value.values
+          .where((item) => item != null)
+          .map((item) => item.toString())
+          .toList();
+    }
+
+    return [];
+  }
 
   factory ProductModel.fromMap(Map<String, dynamic> map, {String? documentId}) {
     return ProductModel(
@@ -73,11 +94,13 @@ class ProductModel {
       categoryId: map['categoryId']?.toString() ?? '',
       categoryName: map['categoryName']?.toString() ?? '',
       brand: map['brand']?.toString() ?? '',
+      sku: map['sku']?.toString() ?? '',
       price: _toDouble(map['price']),
       salePrice: map['salePrice'] != null ? _toDouble(map['salePrice']) : null,
       stock: _toInt(map['stock']),
       soldCount: _toInt(map['soldCount']),
-      images: List<String>.from(map['images'] ?? []),
+      // images: List<String>.from(map['images'] ?? []),
+      images: _parseStringList(map['images']),
       variations:
           (map['variations'] as List?)
               ?.map(
@@ -104,6 +127,7 @@ class ProductModel {
       'categoryId': categoryId,
       'categoryName': categoryName,
       'brand': brand,
+      'sku': sku,
       'price': price,
       'salePrice': salePrice,
       'stock': stock,
@@ -128,6 +152,7 @@ class ProductModel {
     String? categoryId,
     String? categoryName,
     String? brand,
+    String? sku,
     double? price,
     double? salePrice,
     int? stock,
@@ -150,6 +175,7 @@ class ProductModel {
       categoryId: categoryId ?? this.categoryId,
       categoryName: categoryName ?? this.categoryName,
       brand: brand ?? this.brand,
+      sku: sku ?? this.sku,
       price: price ?? this.price,
       salePrice: salePrice ?? this.salePrice,
       stock: stock ?? this.stock,

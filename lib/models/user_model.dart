@@ -55,20 +55,17 @@ class UserModel {
       phone: map['phone']?.toString() ?? '',
       profileImage: map['profileImage']?.toString() ?? '',
       role: map['role']?.toString() ?? 'customer',
-      isActive: map['isActive'] ?? true,
-      emailVerified: map['emailVerified'] ?? false,
 
-      addresses:
-          (map['addresses'] as List?)
-              ?.map(
-                (address) =>
-                    UserAddress.fromMap(Map<String, dynamic>.from(address)),
-              )
-              .toList() ??
-          [],
+      isActive: _toBool(map['isActive'], true),
+
+      emailVerified: _toBool(map['emailVerified'], false),
+
+      addresses: _parseAddresses(map['addresses']),
 
       createdAt: _parseDate(map['createdAt']),
+
       updatedAt: _parseDate(map['updatedAt']),
+
       lastLoginAt: _parseDate(map['lastLoginAt']),
     );
   }
@@ -83,12 +80,16 @@ class UserModel {
       'role': role,
       'isActive': isActive,
       'emailVerified': emailVerified,
-      'addresses': addresses.map((e) => e.toMap()).toList(),
+      'addresses': addresses.map((address) => address.toMap()).toList(),
       'createdAt': createdAt?.toIso8601String(),
       'updatedAt': updatedAt?.toIso8601String(),
       'lastLoginAt': lastLoginAt?.toIso8601String(),
     };
   }
+
+  // ==========================================================
+  // COPY WITH
+  // ==========================================================
 
   UserModel copyWith({
     String? id,
@@ -120,9 +121,81 @@ class UserModel {
     );
   }
 
+  // ==========================================================
+  // ADDRESS PARSER
+  // ==========================================================
+
+  static List<UserAddress> _parseAddresses(dynamic value) {
+    if (value == null) {
+      return [];
+    }
+
+    // Firebase can sometimes return a List
+    if (value is List) {
+      return value
+          .where((item) => item != null && item is Map)
+          .map((item) => UserAddress.fromMap(Map<String, dynamic>.from(item)))
+          .toList();
+    }
+
+    // Firebase Realtime Database can also return a Map
+    if (value is Map) {
+      return value.entries.where((entry) => entry.value is Map).map((entry) {
+        final data = Map<String, dynamic>.from(entry.value);
+
+        // Use Firebase key as address ID
+        // if an ID was not stored inside the address.
+        data['id'] ??= entry.key.toString();
+
+        return UserAddress.fromMap(data);
+      }).toList();
+    }
+
+    return [];
+  }
+
+  // ==========================================================
+  // BOOLEAN PARSER
+  // ==========================================================
+
+  static bool _toBool(dynamic value, bool fallback) {
+    if (value is bool) {
+      return value;
+    }
+
+    if (value is String) {
+      return value.toLowerCase() == 'true';
+    }
+
+    if (value is num) {
+      return value != 0;
+    }
+
+    return fallback;
+  }
+
+  // ==========================================================
+  // DATE PARSER
+  // ==========================================================
+
   static DateTime? _parseDate(dynamic value) {
-    if (value == null) return null;
-    if (value is DateTime) return value;
+    if (value == null) {
+      return null;
+    }
+
+    if (value is DateTime) {
+      return value;
+    }
+
+    // Handles Firebase timestamp stored as milliseconds
+    if (value is int) {
+      return DateTime.fromMillisecondsSinceEpoch(value);
+    }
+
+    if (value is num) {
+      return DateTime.fromMillisecondsSinceEpoch(value.toInt());
+    }
+
     return DateTime.tryParse(value.toString());
   }
 }
@@ -160,6 +233,10 @@ class UserAddress {
     this.isDefault = false,
   });
 
+  // ==========================================================
+  // FIREBASE
+  // ==========================================================
+
   factory UserAddress.fromMap(Map<String, dynamic> map) {
     return UserAddress(
       id: map['id']?.toString() ?? '',
@@ -171,7 +248,8 @@ class UserAddress {
       state: map['state']?.toString() ?? '',
       postalCode: map['postalCode']?.toString() ?? '',
       country: map['country']?.toString() ?? 'Pakistan',
-      isDefault: map['isDefault'] ?? false,
+
+      isDefault: _toBool(map['isDefault'], false),
     );
   }
 
@@ -189,6 +267,10 @@ class UserAddress {
       'isDefault': isDefault,
     };
   }
+
+  // ==========================================================
+  // COPY WITH
+  // ==========================================================
 
   UserAddress copyWith({
     String? id,
@@ -214,5 +296,25 @@ class UserAddress {
       country: country ?? this.country,
       isDefault: isDefault ?? this.isDefault,
     );
+  }
+
+  // ==========================================================
+  // BOOLEAN PARSER
+  // ==========================================================
+
+  static bool _toBool(dynamic value, bool fallback) {
+    if (value is bool) {
+      return value;
+    }
+
+    if (value is String) {
+      return value.toLowerCase() == 'true';
+    }
+
+    if (value is num) {
+      return value != 0;
+    }
+
+    return fallback;
   }
 }

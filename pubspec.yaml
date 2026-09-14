@@ -66,6 +66,8 @@ dependencies:
   fl_chart: ^1.2.0
   permission_handler: ^13.0.2
   firebase_database: ^12.5.0
+  payfast_web: ^1.0.0
+  payfast: ^1.0.2
 
 dev_dependencies:
   flutter_test:

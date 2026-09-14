@@ -1,8 +1,11 @@
+import 'package:e_commerce/views/customer/wishlist_screen.dart';
+
 class AppRoutes {
   // ========================= // General // =========================
   static const splash = '/';
   static const login = '/login';
   static const register = '/register';
+  static const signUP = '/signUp';
   // ========================= // Customer // =========================
   static const home = '/home';
   static const products = '/products';
@@ -14,6 +17,7 @@ class AppRoutes {
   static const orders = '/orders';
   static const orderDetails = '/order-details';
   static const profile = '/profile';
+  static const wishlistScreen = '/wishlist';
   // ========================= // Admin // =========================
   static const adminDashboard = '/admin-dashboard';
   static const adminOrders = '/admin-orders';
