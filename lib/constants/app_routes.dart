@@ -6,8 +6,10 @@ class AppRoutes {
   static const login = '/login';
   static const register = '/register';
   static const signUP = '/signUp';
+
   // ========================= // Customer // =========================
   static const home = '/home';
+
   static const products = '/products';
   static const productDetails = '/product-details';
   static const categories = '/categories';
@@ -16,6 +18,7 @@ class AppRoutes {
   static const orderSuccess = '/order-success';
   static const orders = '/orders';
   static const orderDetails = '/order-details';
+  static const myOrders = '/my-orders';
   static const profile = '/profile';
   static const wishlistScreen = '/wishlist';
   // ========================= // Admin // =========================

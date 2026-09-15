@@ -1,3 +1,5 @@
+import 'package:e_commerce/constants/app_routes.dart';
+import 'package:e_commerce/controllers/auth_controller.dart';
 import 'package:e_commerce/controllers/cart_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -18,6 +20,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   final CartController cartController = Get.find<CartController>();
 
   final OrderController orderController = Get.find<OrderController>();
+  final AuthController authController = Get.find<AuthController>();
+
   final _formKey = GlobalKey<FormState>();
 
   final nameController = TextEditingController();
@@ -394,49 +398,60 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   // ===========================================================================
 
   Future<void> _placeOrder() async {
-    // ------------------------------------------------------------
-    // Validate checkout form
-    // ------------------------------------------------------------
-
     if (!_formKey.currentState!.validate()) {
       return;
     }
 
-    // ------------------------------------------------------------
-    // Make sure cart is not empty
-    // ------------------------------------------------------------
+    // ----------------------------------------------------------
+    // CHECK LOGIN
+    // ----------------------------------------------------------
+
+    final String userId = authController.userId;
+
+    if (userId.trim().isEmpty) {
+      Get.snackbar(
+        'Login Required',
+        'Please login before placing an order.',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+
+      Get.toNamed(AppRoutes.login);
+      return;
+    }
+
+    // ----------------------------------------------------------
+    // CHECK CART
+    // ----------------------------------------------------------
 
     if (cartController.isEmpty) {
       Get.snackbar(
-        'Empty Cart',
-        'Please add products before placing your order.',
+        'Cart Empty',
+        'Please add products before placing an order.',
         snackPosition: SnackPosition.BOTTOM,
       );
       return;
     }
 
-    // ------------------------------------------------------------
-    // Convert payment method to database value
-    // ------------------------------------------------------------
+    // ----------------------------------------------------------
+    // PAYMENT
+    // ----------------------------------------------------------
 
-    String paymentMethodValue;
-
-    switch (paymentMethod) {
-      case 'Card Payment':
-        paymentMethodValue = 'stripe';
-        break;
-
-      case 'Cash on Delivery':
-      default:
-        paymentMethodValue = 'cash_on_delivery';
-        break;
+    // For now we create real orders only for COD.
+    // Stripe / PayFast will be connected separately.
+    if (paymentMethod != 'Cash on Delivery') {
+      Get.snackbar(
+        'Payment Coming Soon',
+        'Online card payment will be connected next.',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return;
     }
 
-    // ------------------------------------------------------------
-    // Convert CartModel → OrderItem
-    // ------------------------------------------------------------
+    // ----------------------------------------------------------
+    // CONVERT CART ITEMS → ORDER ITEMS
+    // ----------------------------------------------------------
 
-    final orderItems = cartController.items.map((cartItem) {
+    final List<OrderItem> orderItems = cartController.items.map((cartItem) {
       return OrderItem(
         productId: cartItem.productId,
         productName: cartItem.productName,
@@ -449,11 +464,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       );
     }).toList();
 
-    // ------------------------------------------------------------
-    // Create shipping address
-    // ------------------------------------------------------------
+    // ----------------------------------------------------------
+    // SHIPPING ADDRESS
+    // ----------------------------------------------------------
 
-    final shippingAddress = ShippingAddress(
+    final ShippingAddress shippingAddress = ShippingAddress(
       fullName: nameController.text.trim(),
       phone: phoneController.text.trim(),
       address: addressController.text.trim(),
@@ -462,78 +477,95 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       country: 'Pakistan',
     );
 
-    // ------------------------------------------------------------
-    // Create OrderModel
-    // ------------------------------------------------------------
+    // ----------------------------------------------------------
+    // CREATE ORDER
+    // ----------------------------------------------------------
 
-    final order = OrderModel(
+    final OrderModel order = OrderModel(
       id: '',
-      userId: '', // We will connect Firebase Auth here next.
+      userId: userId,
       items: orderItems,
-
       subtotal: cartController.subtotal,
       shippingFee: cartController.shipping,
       discount: 0,
       total: cartController.total,
-
       currency: 'PKR',
-
-      paymentMethod: paymentMethodValue,
+      paymentMethod: paymentMethod,
       paymentStatus: 'pending',
-
+      transactionId: null,
       orderStatus: 'pending',
-
       shippingAddress: shippingAddress,
     );
 
-    // ------------------------------------------------------------
-    // Create order in Firebase
-    // ------------------------------------------------------------
+    // ----------------------------------------------------------
+    // SAVE TO FIREBASE
+    // ----------------------------------------------------------
 
     final createdOrder = await orderController.createOrder(order);
-
-    // ------------------------------------------------------------
-    // Failed
-    // ------------------------------------------------------------
 
     if (createdOrder == null) {
       return;
     }
 
-    // ------------------------------------------------------------
-    // Order successfully created
-    // ------------------------------------------------------------
+    // ----------------------------------------------------------
+    // CLEAR CART
+    // ----------------------------------------------------------
 
     cartController.clearCart();
 
-    Get.dialog(
-      AlertDialog(
-        title: Text(
-          'Order Placed',
-          style: GoogleFonts.poppins(fontWeight: FontWeight.w700),
-        ),
-        content: Text(
-          'Your order has been placed successfully.\n\n'
-          'Order ID: ${createdOrder.id}',
-          style: GoogleFonts.poppins(fontSize: 12.sp, height: 1.5),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Get.back();
-              Get.offAllNamed('/orders');
-            },
-            child: Text(
-              'View My Orders',
-              style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
-            ),
-          ),
-        ],
-      ),
-      barrierDismissible: false,
-    );
-  }
+    // ----------------------------------------------------------
+    // SUCCESS
+    // ----------------------------------------------------------
 
+    Get.offNamed(
+      AppRoutes.orderSuccess,
+      arguments: {
+        'orderId': createdOrder.id,
+        'total': createdOrder.total,
+        'paymentMethod': createdOrder.paymentMethod,
+      },
+    );
+    // Get.dialog(
+    //   PopScope(
+    //     canPop: false,
+    //     child: AlertDialog(
+    //       title: Row(
+    //         children: [
+    //           const Icon(Iconsax.tick_circle, color: Colors.green),
+    //           const SizedBox(width: 10),
+    //           Text(
+    //             'Order Placed!',
+    //             style: GoogleFonts.poppins(fontWeight: FontWeight.w700),
+    //           ),
+    //         ],
+    //       ),
+    //       content: Text(
+    //         'Your order has been placed successfully.\n\n'
+    //         'Order ID:\n${createdOrder.id}\n\n'
+    //         'Total: PKR ${createdOrder.total.toStringAsFixed(0)}\n\n'
+    //         'Payment: Cash on Delivery',
+    //         style: GoogleFonts.poppins(fontSize: 13, height: 1.6),
+    //       ),
+    //       actions: [
+    //         TextButton(
+    //           onPressed: () {
+    //             Get.back();
+    //             Get.offAllNamed(AppRoutes.home);
+    //           },
+    //           child: Text(
+    //             'Continue Shopping',
+    //             style: GoogleFonts.poppins(
+    //               color: const Color(0xFF6846E8),
+    //               fontWeight: FontWeight.w600,
+    //             ),
+    //           ),
+    //         ),
+    //       ],
+    //     ),
+    //   ),
+    //   barrierDismissible: false,
+    // );
+  }
   // ===========================================================================
   // SECTION TITLE
   // ===========================================================================

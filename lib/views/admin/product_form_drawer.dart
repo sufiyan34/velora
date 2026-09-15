@@ -1,3 +1,4 @@
+import 'package:e_commerce/controllers/cloudinary_media_controller.dart';
 import 'package:e_commerce/utills/admin_badge.dart';
 import 'package:e_commerce/utills/admin_buttons.dart';
 import 'package:e_commerce/utills/right_drawer.dart';
@@ -10,8 +11,8 @@ import '../../../../models/product_model.dart';
 import '../../../../theme/admin_theme.dart';
 import 'variation_editor.dart';
 
-/// Opens the add/edit product panel, sliding in from the right (full-screen
-/// on mobile via [showRightDrawer]).
+/// Opens the add/edit product panel, sliding in from the right.
+/// On mobile, [showRightDrawer] handles the full-screen presentation.
 Future<void> showProductFormDrawer({
   required BuildContext context,
   required ProductController controller,
@@ -35,6 +36,7 @@ class ProductFormDrawer extends StatefulWidget {
 
 class _ProductFormDrawerState extends State<ProductFormDrawer> {
   late final CategoryController _categoryController;
+  late final CloudinaryMediaController _mediaController;
 
   late final TextEditingController _name;
   late final TextEditingController _description;
@@ -45,11 +47,32 @@ class _ProductFormDrawerState extends State<ProductFormDrawer> {
   late final TextEditingController _sku;
 
   String? _categoryId;
+
   bool _isActive = true;
   bool _isFeatured = false;
   bool _isNew = false;
   bool _isOnSale = false;
+
+  bool _model3dAutoRotate = true;
+  bool _model3dArEnabled = false;
+
   List<ProductVariation> _variations = [];
+
+  // ==========================================================
+  // MEDIA
+  // ==========================================================
+
+  List<String> _images = [];
+
+  String? _videoUrl;
+
+  String? _model3dUrl;
+
+  String? _model3dIosUrl;
+
+  // ==========================================================
+  // FORM STATE
+  // ==========================================================
 
   bool _saving = false;
   String? _error;
@@ -59,30 +82,69 @@ class _ProductFormDrawerState extends State<ProductFormDrawer> {
   @override
   void initState() {
     super.initState();
+
     _categoryController =
         Get.isRegistered<CategoryController>(tag: 'categories')
         ? Get.find<CategoryController>(tag: 'categories')
         : Get.put(CategoryController(), tag: 'categories');
 
+    _mediaController = Get.find<CloudinaryMediaController>();
+
     final p = widget.product;
+
+    // ========================================================
+    // BASIC FIELDS
+    // ========================================================
+
     _name = TextEditingController(text: p?.name ?? '');
+
     _description = TextEditingController(text: p?.description ?? '');
+
     _brand = TextEditingController(text: p?.brand ?? '');
+
     _price = TextEditingController(
       text: p != null ? p.price.toStringAsFixed(2) : '',
     );
+
     _salePrice = TextEditingController(
       text: p?.salePrice != null ? p!.salePrice!.toStringAsFixed(2) : '',
     );
+
     _stock = TextEditingController(text: p != null ? p.stock.toString() : '');
+
     _sku = TextEditingController(text: p?.sku ?? '');
 
+    // ========================================================
+    // FORM VALUES
+    // ========================================================
+
     _categoryId = p?.categoryId;
+
     _isActive = p?.isActive ?? true;
+
     _isFeatured = p?.isFeatured ?? false;
+
     _isNew = p?.isNew ?? false;
+
     _isOnSale = p?.isOnSale ?? false;
-    _variations = List.of(p?.variations ?? const []);
+
+    _variations = List<ProductVariation>.of(p?.variations ?? const []);
+
+    // ========================================================
+    // MEDIA
+    // ========================================================
+
+    _images = List<String>.of(p?.images ?? const []);
+
+    _videoUrl = p?.videoUrl;
+
+    _model3dUrl = p?.model3dUrl;
+
+    _model3dIosUrl = p?.model3dIosUrl;
+
+    _model3dAutoRotate = p?.model3dAutoRotate ?? true;
+
+    _model3dArEnabled = p?.model3dArEnabled ?? false;
   }
 
   @override
@@ -94,41 +156,228 @@ class _ProductFormDrawerState extends State<ProductFormDrawer> {
     _salePrice.dispose();
     _stock.dispose();
     _sku.dispose();
+
     super.dispose();
   }
 
+  // ==========================================================
+  // CATEGORY OPTIONS
+  // ==========================================================
+
   List<DropdownMenuItem<String>> _categoryOptions() {
     final items = <DropdownMenuItem<String>>[];
-    void walk(List depth0, int depth) {
-      for (final c in depth0) {
+
+    void walk(List<dynamic> categories, int depth) {
+      for (final category in categories) {
         items.add(
           DropdownMenuItem<String>(
-            value: c.id as String,
-            child: Text('${'—' * depth} ${c.name}'.trim()),
+            value: category.id as String,
+            child: Text('${'—' * depth} ${category.name}'.trim()),
           ),
         );
-        walk(_categoryController.childrenOf(c.id), depth + 1);
+
+        walk(_categoryController.childrenOf(category.id), depth + 1);
       }
     }
 
     walk(_categoryController.topLevel(), 0);
+
     return items;
   }
 
+  // ==========================================================
+  // UPLOAD IMAGES
+  // ==========================================================
+
+  Future<void> _uploadImages() async {
+    setState(() {
+      _error = null;
+    });
+
+    try {
+      final results = await _mediaController.pickAndUploadImages(maxFiles: 10);
+
+      if (!mounted || results.isEmpty) {
+        return;
+      }
+
+      final urls = results
+          .map((result) => result.secureUrl.trim())
+          .where((url) => url.isNotEmpty)
+          .toList();
+
+      if (urls.isEmpty) return;
+
+      setState(() {
+        _images.addAll(urls);
+      });
+    } catch (_) {
+      if (!mounted) return;
+
+      setState(() {
+        _error = _mediaController.errorMessage.value.isNotEmpty
+            ? _mediaController.errorMessage.value
+            : 'Unable to upload images.';
+      });
+    }
+  }
+
+  // ==========================================================
+  // UPLOAD VIDEO
+  // ==========================================================
+
+  Future<void> _uploadVideo() async {
+    setState(() {
+      _error = null;
+    });
+
+    try {
+      final result = await _mediaController.pickAndUploadVideo();
+
+      if (!mounted || result == null) {
+        return;
+      }
+
+      final url = result.secureUrl.trim();
+
+      if (url.isEmpty) {
+        throw Exception('Cloudinary returned an empty video URL.');
+      }
+
+      setState(() {
+        _videoUrl = url;
+      });
+    } catch (_) {
+      if (!mounted) return;
+
+      setState(() {
+        _error = _mediaController.errorMessage.value.isNotEmpty
+            ? _mediaController.errorMessage.value
+            : 'Unable to upload video.';
+      });
+    }
+  }
+
+  // ==========================================================
+  // UPLOAD GLB / GLTF
+  // ==========================================================
+
+  Future<void> _upload3dModel() async {
+    setState(() {
+      _error = null;
+    });
+
+    try {
+      final result = await _mediaController.pickAndUploadGlb();
+
+      if (!mounted || result == null) {
+        return;
+      }
+
+      final url = result.secureUrl.trim();
+
+      if (url.isEmpty) {
+        throw Exception('Cloudinary returned an empty 3D URL.');
+      }
+
+      setState(() {
+        _model3dUrl = url;
+      });
+    } catch (_) {
+      if (!mounted) return;
+
+      setState(() {
+        _error = _mediaController.errorMessage.value.isNotEmpty
+            ? _mediaController.errorMessage.value
+            : 'Unable to upload 3D model.';
+      });
+    }
+  }
+
+  // ==========================================================
+  // UPLOAD USDZ
+  // ==========================================================
+
+  Future<void> _uploadUsdZ() async {
+    setState(() {
+      _error = null;
+    });
+
+    try {
+      final result = await _mediaController.pickAndUploadUsdZ();
+
+      if (!mounted || result == null) {
+        return;
+      }
+
+      final url = result.secureUrl.trim();
+
+      if (url.isEmpty) {
+        throw Exception('Cloudinary returned an empty USDZ URL.');
+      }
+
+      setState(() {
+        _model3dIosUrl = url;
+      });
+    } catch (_) {
+      if (!mounted) return;
+
+      setState(() {
+        _error = _mediaController.errorMessage.value.isNotEmpty
+            ? _mediaController.errorMessage.value
+            : 'Unable to upload USDZ model.';
+      });
+    }
+  }
+
+  // ==========================================================
+  // SAVE
+  // ==========================================================
+
   Future<void> _save() async {
     final name = _name.text.trim();
+
     final price = double.tryParse(_price.text.trim());
 
     if (name.isEmpty) {
-      setState(() => _error = 'Give the product a name first.');
+      setState(() {
+        _error = 'Give the product a name first.';
+      });
       return;
     }
+
     if (_categoryId == null || _categoryId!.isEmpty) {
-      setState(() => _error = 'Choose a category.');
+      setState(() {
+        _error = 'Choose a category.';
+      });
       return;
     }
+
     if (price == null || price < 0) {
-      setState(() => _error = 'Enter a valid price.');
+      setState(() {
+        _error = 'Enter a valid price.';
+      });
+      return;
+    }
+
+    final salePriceText = _salePrice.text.trim();
+
+    final parsedSalePrice = salePriceText.isEmpty
+        ? null
+        : double.tryParse(salePriceText);
+
+    if (salePriceText.isNotEmpty &&
+        (parsedSalePrice == null || parsedSalePrice < 0)) {
+      setState(() {
+        _error = 'Enter a valid sale price.';
+      });
+      return;
+    }
+
+    if (parsedSalePrice != null && parsedSalePrice > price) {
+      setState(() {
+        _error = 'Sale price cannot be greater than the regular price.';
+      });
       return;
     }
 
@@ -145,24 +394,52 @@ class _ProductFormDrawerState extends State<ProductFormDrawer> {
       id: widget.product?.id ?? '',
       name: name,
       description: _description.text.trim(),
+
       categoryId: _categoryId!,
-      categoryName: _categoryController.categoryPath(_categoryId),
+
+      categoryName: _categoryController.categoryPath(_categoryId!),
+
       brand: _brand.text.trim(),
+
       sku: sku,
+
       price: price,
-      salePrice: _salePrice.text.trim().isEmpty
-          ? null
-          : double.tryParse(_salePrice.text.trim()),
+
+      salePrice: parsedSalePrice,
+
       stock: int.tryParse(_stock.text.trim()) ?? 0,
+
       soldCount: widget.product?.soldCount ?? 0,
-      images: widget.product?.images ?? const [],
-      variations: _variations,
+
+      images: List<String>.of(_images),
+
+      videoUrl: _videoUrl,
+
+      variations: List<ProductVariation>.of(_variations),
+
       rating: widget.product?.rating ?? 0,
+
       reviewCount: widget.product?.reviewCount ?? 0,
+
       isActive: _isActive,
+
       isFeatured: _isFeatured,
+
       isNew: _isNew,
+
       isOnSale: _isOnSale,
+
+      model3dUrl: _model3dUrl,
+
+      model3dIosUrl: _model3dIosUrl,
+
+      model3dAutoRotate: _model3dAutoRotate,
+
+      model3dArEnabled: _model3dArEnabled,
+
+      createdAt: widget.product?.createdAt,
+
+      updatedAt: DateTime.now(),
     );
 
     try {
@@ -171,8 +448,13 @@ class _ProductFormDrawerState extends State<ProductFormDrawer> {
       } else {
         await widget.controller.addProduct(data);
       }
-      if (mounted) Navigator.of(context).pop();
-    } catch (e) {
+
+      if (!mounted) return;
+
+      Navigator.of(context).pop();
+    } catch (_) {
+      if (!mounted) return;
+
       setState(() {
         _saving = false;
         _error = "Couldn't save this product. Please try again.";
@@ -180,20 +462,31 @@ class _ProductFormDrawerState extends State<ProductFormDrawer> {
     }
   }
 
+  // ==========================================================
+  // BUILD
+  // ==========================================================
+
   @override
   Widget build(BuildContext context) {
     return Material(
       color: AdminColors.surface,
+
       child: Column(
         children: [
           _DrawerHeader(isEditing: _isEditing),
+
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(24, 20, 24, 12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // ==================================================
+                  // BASICS
+                  // ==================================================
+
                   const _SectionLabel('Basics'),
+
                   _Field(
                     label: 'Product name',
                     child: TextField(
@@ -203,16 +496,18 @@ class _ProductFormDrawerState extends State<ProductFormDrawer> {
                       ),
                     ),
                   ),
+
                   _Field(
                     label: 'Description',
                     child: TextField(
                       controller: _description,
-                      maxLines: 3,
+                      maxLines: 4,
                       decoration: const InputDecoration(
-                        hintText: 'What makes this piece worth wearing…',
+                        hintText: 'What makes this product worth buying…',
                       ),
                     ),
                   ),
+
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -224,11 +519,17 @@ class _ProductFormDrawerState extends State<ProductFormDrawer> {
                             isExpanded: true,
                             items: _categoryOptions(),
                             hint: const Text('Select a category'),
-                            onChanged: (v) => setState(() => _categoryId = v),
+                            onChanged: (value) {
+                              setState(() {
+                                _categoryId = value;
+                              });
+                            },
                           ),
                         ),
                       ),
+
                       const SizedBox(width: 12),
+
                       Expanded(
                         child: _Field(
                           label: 'Brand',
@@ -242,7 +543,12 @@ class _ProductFormDrawerState extends State<ProductFormDrawer> {
                       ),
                     ],
                   ),
+
+                  // ==================================================
+                  // PRICING
+                  // ==================================================
                   const _SectionLabel('Pricing & stock'),
+
                   Row(
                     children: [
                       Expanded(
@@ -257,7 +563,9 @@ class _ProductFormDrawerState extends State<ProductFormDrawer> {
                           ),
                         ),
                       ),
+
                       const SizedBox(width: 10),
+
                       Expanded(
                         child: _Field(
                           label: 'Sale price',
@@ -272,7 +580,9 @@ class _ProductFormDrawerState extends State<ProductFormDrawer> {
                           ),
                         ),
                       ),
+
                       const SizedBox(width: 10),
+
                       Expanded(
                         child: _Field(
                           label: 'Stock',
@@ -285,6 +595,7 @@ class _ProductFormDrawerState extends State<ProductFormDrawer> {
                       ),
                     ],
                   ),
+
                   _Field(
                     label: 'SKU',
                     child: TextField(
@@ -294,104 +605,582 @@ class _ProductFormDrawerState extends State<ProductFormDrawer> {
                       ),
                     ),
                   ),
-                  const _SectionLabel('Photos'),
-                  _Field(
-                    label: '',
-                    hint:
-                        'This prototype shows a colour swatch in place of real photography — wire this to Firebase Storage / image_picker.',
-                    child: Row(
-                      children: [
-                        AdminSwatch(
-                          seed: _name.text.isEmpty ? 'New' : _name.text,
-                          size: 56,
-                        ),
-                        const SizedBox(width: 10),
-                        Container(
-                          width: 56,
-                          height: 56,
-                          decoration: BoxDecoration(
-                            border: Border.all(
-                              color: AdminColors.line,
-                              style: BorderStyle.solid,
-                            ),
-                            borderRadius: BorderRadius.circular(9),
-                          ),
-                          child: const Icon(
-                            Icons.add_rounded,
-                            color: AdminColors.muted,
-                          ),
-                        ),
-                      ],
+
+                  // ==================================================
+                  // MEDIA
+                  // ==================================================
+                  const _SectionLabel('Media'),
+
+                  Obx(
+                    () => _MediaSection(
+                      isUploading: _mediaController.isUploading.value,
+                      progress: _mediaController.progress.value,
+                      currentFileName: _mediaController.currentFileName.value,
+                      images: _images,
+                      videoUrl: _videoUrl,
+                      onUploadImages: _uploadImages,
+                      onUploadVideo: _uploadVideo,
+                      onRemoveImage: (image) {
+                        setState(() {
+                          _images.remove(image);
+                        });
+                      },
+                      onRemoveVideo: () {
+                        setState(() {
+                          _videoUrl = null;
+                        });
+                      },
                     ),
                   ),
+
+                  // ==================================================
+                  // VARIATIONS
+                  // ==================================================
                   const _SectionLabel('Variations'),
+
                   VariationEditor(
                     initial: _variations,
-                    onChanged: (v) => _variations = v,
+                    onChanged: (value) {
+                      _variations = value;
+                    },
                   ),
+
+                  // ==================================================
+                  // 3D
+                  // ==================================================
+                  const _SectionLabel('3D Product'),
+
+                  Obx(
+                    () => _ThreeDSection(
+                      isUploading: _mediaController.isUploading.value,
+                      model3dUrl: _model3dUrl,
+                      model3dIosUrl: _model3dIosUrl,
+                      onUploadModel: _upload3dModel,
+                      onUploadUsdZ: _uploadUsdZ,
+                      onRemoveModel: () {
+                        setState(() {
+                          _model3dUrl = null;
+                        });
+                      },
+                      onRemoveUsdZ: () {
+                        setState(() {
+                          _model3dIosUrl = null;
+                        });
+                      },
+                    ),
+                  ),
+
+                  _ToggleRow(
+                    label: '3D auto rotate',
+                    description: 'Automatically rotate the 3D product',
+                    value: _model3dAutoRotate,
+                    onChanged: (value) {
+                      setState(() {
+                        _model3dAutoRotate = value;
+                      });
+                    },
+                  ),
+
+                  _ToggleRow(
+                    label: '3D AR experience',
+                    description: 'Enable AR where the device supports it',
+                    value: _model3dArEnabled,
+                    onChanged: (value) {
+                      setState(() {
+                        _model3dArEnabled = value;
+                      });
+                    },
+                  ),
+
+                  // ==================================================
+                  // VISIBILITY
+                  // ==================================================
                   const _SectionLabel('Visibility'),
+
                   _ToggleRow(
                     label: 'Active',
                     description: 'Visible in the storefront and search',
                     value: _isActive,
-                    onChanged: (v) => setState(() => _isActive = v),
+                    onChanged: (value) {
+                      setState(() {
+                        _isActive = value;
+                      });
+                    },
                   ),
+
                   _ToggleRow(
                     label: 'Featured',
                     description: "Shown in the home page's Featured rail",
                     value: _isFeatured,
-                    onChanged: (v) => setState(() => _isFeatured = v),
+                    onChanged: (value) {
+                      setState(() {
+                        _isFeatured = value;
+                      });
+                    },
                   ),
+
                   _ToggleRow(
                     label: 'New arrival',
                     description: 'Flags a "New" badge on the product card',
                     value: _isNew,
-                    onChanged: (v) => setState(() => _isNew = v),
+                    onChanged: (value) {
+                      setState(() {
+                        _isNew = value;
+                      });
+                    },
                   ),
+
                   _ToggleRow(
                     label: 'On sale',
                     description: 'Shows the sale price and discount badge',
                     value: _isOnSale,
-                    onChanged: (v) => setState(() => _isOnSale = v),
+                    onChanged: (value) {
+                      setState(() {
+                        _isOnSale = value;
+                      });
+                    },
                   ),
+
                   if (_error != null) ...[
                     const SizedBox(height: 10),
-                    Text(
-                      _error!,
-                      style: AdminText.body(12.5, color: AdminColors.danger),
+
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AdminColors.danger.withValues(alpha: 0.08),
+                        border: Border.all(
+                          color: AdminColors.danger.withValues(alpha: 0.25),
+                        ),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        _error!,
+                        style: AdminText.body(12.5, color: AdminColors.danger),
+                      ),
                     ),
                   ],
+
                   const SizedBox(height: 8),
                 ],
               ),
             ),
           ),
+
+          // ========================================================
+          // FOOTER
+          // ========================================================
+          Obx(() {
+            final uploading = _mediaController.isUploading.value;
+
+            return Container(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              decoration: const BoxDecoration(
+                border: Border(top: BorderSide(color: AdminColors.line)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  AdminGhostButton(
+                    label: 'Cancel',
+                    onPressed: _saving || uploading
+                        ? null
+                        : () {
+                            Navigator.of(context).pop();
+                          },
+                  ),
+
+                  const SizedBox(width: 10),
+
+                  AdminPrimaryButton(
+                    label: 'Save product',
+                    loading: _saving,
+                    onPressed: _saving || uploading ? null : _save,
+                  ),
+                ],
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+}
+
+// ============================================================================
+// MEDIA SECTION
+// ============================================================================
+
+class _MediaSection extends StatelessWidget {
+  const _MediaSection({
+    required this.isUploading,
+    required this.progress,
+    required this.currentFileName,
+    required this.images,
+    required this.videoUrl,
+    required this.onUploadImages,
+    required this.onUploadVideo,
+    required this.onRemoveImage,
+    required this.onRemoveVideo,
+  });
+
+  final bool isUploading;
+  final double progress;
+  final String currentFileName;
+
+  final List<String> images;
+  final String? videoUrl;
+
+  final VoidCallback onUploadImages;
+  final VoidCallback onUploadVideo;
+
+  final ValueChanged<String> onRemoveImage;
+
+  final VoidCallback onRemoveVideo;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Product images',
+          style: AdminText.body(
+            12.5,
+            weight: FontWeight.w600,
+            color: AdminColors.inkSoft,
+          ),
+        ),
+
+        const SizedBox(height: 8),
+
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: [
+            for (final image in images)
+              _ImagePreview(
+                imageUrl: image,
+                onRemove: () {
+                  onRemoveImage(image);
+                },
+              ),
+
+            InkWell(
+              onTap: isUploading ? null : onUploadImages,
+              borderRadius: BorderRadius.circular(10),
+              child: Container(
+                width: 88,
+                height: 88,
+                decoration: BoxDecoration(
+                  border: Border.all(color: AdminColors.line),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.add_photo_alternate_outlined),
+                    SizedBox(height: 5),
+                    Text('Add images', style: TextStyle(fontSize: 11)),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+
+        const SizedBox(height: 6),
+
+        Text(
+          'Images are compressed and resized automatically before upload.',
+          style: AdminText.body(11.5, color: AdminColors.muted),
+        ),
+
+        const SizedBox(height: 14),
+
+        Text(
+          'Product video',
+          style: AdminText.body(
+            12.5,
+            weight: FontWeight.w600,
+            color: AdminColors.inkSoft,
+          ),
+        ),
+
+        const SizedBox(height: 8),
+
+        if (videoUrl != null && videoUrl!.isNotEmpty)
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-            decoration: const BoxDecoration(
-              border: Border(top: BorderSide(color: AdminColors.line)),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              border: Border.all(color: AdminColors.line),
+              borderRadius: BorderRadius.circular(10),
             ),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                AdminGhostButton(
-                  label: 'Cancel',
-                  onPressed: () => Navigator.of(context).pop(),
-                ),
-                const SizedBox(width: 10),
-                AdminPrimaryButton(
-                  label: 'Save product',
-                  loading: _saving,
-                  onPressed: _save,
+                const Icon(Icons.video_library_outlined, size: 20),
+
+                const SizedBox(width: 8),
+
+                const Expanded(child: Text('Product video uploaded')),
+
+                IconButton(
+                  tooltip: 'Remove video',
+                  onPressed: isUploading ? null : onRemoveVideo,
+                  icon: const Icon(Icons.close_rounded, size: 18),
                 ),
               ],
             ),
+          ),
+
+        const SizedBox(height: 8),
+
+        OutlinedButton.icon(
+          onPressed: isUploading ? null : onUploadVideo,
+          icon: const Icon(Icons.video_library_outlined),
+          label: Text(videoUrl == null ? 'Upload video' : 'Replace video'),
+        ),
+
+        if (isUploading) ...[
+          const SizedBox(height: 14),
+
+          LinearProgressIndicator(value: progress <= 0 ? null : progress),
+
+          const SizedBox(height: 6),
+
+          Text(
+            currentFileName.isEmpty
+                ? 'Uploading media...'
+                : 'Uploading $currentFileName',
+            style: AdminText.body(11.5, color: AdminColors.muted),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+// ============================================================================
+// 3D SECTION
+// ============================================================================
+
+class _ThreeDSection extends StatelessWidget {
+  const _ThreeDSection({
+    required this.isUploading,
+    required this.model3dUrl,
+    required this.model3dIosUrl,
+    required this.onUploadModel,
+    required this.onUploadUsdZ,
+    required this.onRemoveModel,
+    required this.onRemoveUsdZ,
+  });
+
+  final bool isUploading;
+
+  final String? model3dUrl;
+  final String? model3dIosUrl;
+
+  final VoidCallback onUploadModel;
+  final VoidCallback onUploadUsdZ;
+
+  final VoidCallback onRemoveModel;
+  final VoidCallback onRemoveUsdZ;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Primary 3D model',
+          style: AdminText.body(
+            12.5,
+            weight: FontWeight.w600,
+            color: AdminColors.inkSoft,
+          ),
+        ),
+
+        const SizedBox(height: 8),
+
+        _UploadAssetTile(
+          icon: Icons.view_in_ar_outlined,
+          title: model3dUrl == null ? 'Upload GLB / GLTF' : '3D model uploaded',
+          subtitle: model3dUrl == null
+              ? 'Recommended: GLB'
+              : 'Ready for the customer 3D viewer',
+          uploaded: model3dUrl != null,
+          enabled: !isUploading,
+          onUpload: onUploadModel,
+          onRemove: model3dUrl != null ? onRemoveModel : null,
+        ),
+
+        const SizedBox(height: 12),
+
+        Text(
+          'iOS AR model',
+          style: AdminText.body(
+            12.5,
+            weight: FontWeight.w600,
+            color: AdminColors.inkSoft,
+          ),
+        ),
+
+        const SizedBox(height: 8),
+
+        _UploadAssetTile(
+          icon: Icons.phone_iphone_rounded,
+          title: model3dIosUrl == null ? 'Upload USDZ' : 'USDZ model uploaded',
+          subtitle: model3dIosUrl == null
+              ? 'Optional iOS AR asset'
+              : 'Ready for supported iOS AR experiences',
+          uploaded: model3dIosUrl != null,
+          enabled: !isUploading,
+          onUpload: onUploadUsdZ,
+          onRemove: model3dIosUrl != null ? onRemoveUsdZ : null,
+        ),
+      ],
+    );
+  }
+}
+
+// ============================================================================
+// UPLOAD TILE
+// ============================================================================
+
+class _UploadAssetTile extends StatelessWidget {
+  const _UploadAssetTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.uploaded,
+    required this.enabled,
+    required this.onUpload,
+    required this.onRemove,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+
+  final bool uploaded;
+  final bool enabled;
+
+  final VoidCallback onUpload;
+  final VoidCallback? onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        border: Border.all(color: AdminColors.line),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: AdminColors.line.withValues(alpha: 0.35),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, size: 21),
+          ),
+
+          const SizedBox(width: 10),
+
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: AdminText.body(12.5, weight: FontWeight.w600),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: AdminText.body(11.5, color: AdminColors.muted),
+                ),
+              ],
+            ),
+          ),
+
+          if (uploaded && onRemove != null)
+            IconButton(
+              tooltip: 'Remove',
+              onPressed: enabled ? onRemove : null,
+              icon: const Icon(Icons.delete_outline_rounded, size: 19),
+            ),
+
+          OutlinedButton(
+            onPressed: enabled ? onUpload : null,
+            child: Text(uploaded ? 'Replace' : 'Upload'),
           ),
         ],
       ),
     );
   }
 }
+
+// ============================================================================
+// IMAGE PREVIEW
+// ============================================================================
+
+class _ImagePreview extends StatelessWidget {
+  const _ImagePreview({required this.imageUrl, required this.onRemove});
+
+  final String imageUrl;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(10),
+          child: Image.network(
+            imageUrl,
+            width: 88,
+            height: 88,
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) {
+              return Container(
+                width: 88,
+                height: 88,
+                color: AdminColors.line,
+                alignment: Alignment.center,
+                child: const Icon(Icons.broken_image_outlined),
+              );
+            },
+          ),
+        ),
+
+        Positioned(
+          top: 4,
+          right: 4,
+          child: Material(
+            color: Colors.black54,
+            shape: const CircleBorder(),
+            child: InkWell(
+              customBorder: const CircleBorder(),
+              onTap: onRemove,
+              child: const Padding(
+                padding: EdgeInsets.all(5),
+                child: Icon(Icons.close_rounded, size: 14, color: Colors.white),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ============================================================================
+// HEADER
+// ============================================================================
 
 class _DrawerHeader extends StatelessWidget {
   const _DrawerHeader({required this.isEditing});
@@ -425,6 +1214,7 @@ class _DrawerHeader extends StatelessWidget {
               ],
             ),
           ),
+
           IconButton(
             onPressed: () => Navigator.of(context).pop(),
             icon: const Icon(Icons.close_rounded, size: 18),
@@ -434,6 +1224,10 @@ class _DrawerHeader extends StatelessWidget {
     );
   }
 }
+
+// ============================================================================
+// SECTION LABEL
+// ============================================================================
 
 class _SectionLabel extends StatelessWidget {
   const _SectionLabel(this.text);
@@ -455,6 +1249,10 @@ class _SectionLabel extends StatelessWidget {
     );
   }
 }
+
+// ============================================================================
+// FIELD
+// ============================================================================
 
 class _Field extends StatelessWidget {
   const _Field({required this.label, required this.child, this.hint});
@@ -481,7 +1279,9 @@ class _Field extends StatelessWidget {
             ),
             const SizedBox(height: 6),
           ],
+
           child,
+
           if (hint != null) ...[
             const SizedBox(height: 5),
             Text(hint!, style: AdminText.body(11.5, color: AdminColors.muted)),
@@ -491,6 +1291,10 @@ class _Field extends StatelessWidget {
     );
   }
 }
+
+// ============================================================================
+// TOGGLE
+// ============================================================================
 
 class _ToggleRow extends StatelessWidget {
   const _ToggleRow({
@@ -503,6 +1307,7 @@ class _ToggleRow extends StatelessWidget {
   final String label;
   final String description;
   final bool value;
+
   final ValueChanged<bool> onChanged;
 
   @override
@@ -526,6 +1331,7 @@ class _ToggleRow extends StatelessWidget {
               ],
             ),
           ),
+
           Switch.adaptive(
             value: value,
             onChanged: onChanged,

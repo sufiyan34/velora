@@ -5,12 +5,17 @@ import '../repositories/category_repository.dart';
 
 /// Drives the Categories & Subcategories admin screen.
 ///
-/// Categories are kept as one flat, reactive list; the screen builds the
-/// nested tree from `parentCategoryId` using the helpers below, so adding a
-/// subcategory is just adding a category with a parent set.
+/// The screen is two flat lists, not a tree:
+/// - "Categories" = every category with no parent.
+/// - "Subcategories" = every category that has a parent, shown with which
+///   category group it belongs to.
+///
+/// A subcategory cannot itself have a parent set to another subcategory —
+/// the UI only ever offers top-level categories as a "category group", so
+/// nesting stays exactly two levels deep.
 class CategoryController extends GetxController {
   CategoryController({CategoryRepository? repository})
-      : _repo = repository ?? CategoryRepository();
+    : _repo = repository ?? CategoryRepository();
 
   final CategoryRepository _repo;
 
@@ -18,9 +23,14 @@ class CategoryController extends GetxController {
   final isLoading = true.obs;
   final isSaving = false.obs;
 
-  final searchTerm = ''.obs;
-  final statusFilter = 'all'.obs; // all | active | inactive
-  final expandedIds = <String>{}.obs;
+  // Categories tab
+  final categorySearch = ''.obs;
+  final categoryStatusFilter = 'all'.obs; // all | active | inactive
+
+  // Subcategories tab
+  final subSearch = ''.obs;
+  final subStatusFilter = 'all'.obs; // all | active | inactive
+  final subGroupFilter = ''.obs; // '' = all groups, else a category id
 
   @override
   void onInit() {
@@ -28,11 +38,6 @@ class CategoryController extends GetxController {
     _repo.watchAll().listen((list) {
       categories.assignAll(list);
       isLoading.value = false;
-      if (expandedIds.isEmpty) {
-        expandedIds.addAll(
-          list.where((c) => c.isTopLevel).map((c) => c.id),
-        );
-      }
     }, onError: (_) => isLoading.value = false);
   }
 
@@ -43,8 +48,17 @@ class CategoryController extends GetxController {
     return null;
   }
 
+  /// Top-level categories only — these are the "category groups" a
+  /// subcategory can be added under.
   List<CategoryModel> topLevel() {
     final list = categories.where((c) => c.isTopLevel).toList();
+    list.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+    return list;
+  }
+
+  /// Every subcategory, regardless of which group it's under.
+  List<CategoryModel> allSubcategories() {
+    final list = categories.where((c) => c.isSubcategory).toList();
     list.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
     return list;
   }
@@ -55,18 +69,9 @@ class CategoryController extends GetxController {
     return list;
   }
 
-  /// Every id nested under [id], at any depth — used to stop a category
-  /// being re-parented under its own descendant.
-  List<String> allDescendants(String id) {
-    final out = <String>[];
-    for (final child in childrenOf(id)) {
-      out.add(child.id);
-      out.addAll(allDescendants(child.id));
-    }
-    return out;
-  }
+  int subcategoryCountOf(String id) => childrenOf(id).length;
 
-  /// "Women / Dresses" style breadcrumb, used on the products screen too.
+  /// "Women / Dresses" style breadcrumb, also used by the products screen.
   String categoryPath(String? id) {
     if (id == null || id.isEmpty) return '';
     final match = byId(id);
@@ -75,12 +80,18 @@ class CategoryController extends GetxController {
     return '${categoryPath(match.parentCategoryId)} / ${match.name}';
   }
 
-  bool matchesFilters(CategoryModel c) {
-    final term = searchTerm.value.trim().toLowerCase();
-    final matchesSearch = term.isEmpty ||
+  String groupNameOf(String? parentId) {
+    if (parentId == null || parentId.isEmpty) return '—';
+    return byId(parentId)?.name ?? '—';
+  }
+
+  bool matchesCategoryFilters(CategoryModel c) {
+    final term = categorySearch.value.trim().toLowerCase();
+    final matchesSearch =
+        term.isEmpty ||
         c.name.toLowerCase().contains(term) ||
         c.description.toLowerCase().contains(term);
-    final matchesStatus = switch (statusFilter.value) {
+    final matchesStatus = switch (categoryStatusFilter.value) {
       'active' => c.isActive,
       'inactive' => !c.isActive,
       _ => true,
@@ -88,32 +99,27 @@ class CategoryController extends GetxController {
     return matchesSearch && matchesStatus;
   }
 
-  /// True if this category itself doesn't match the current filters but a
-  /// descendant does — the screen keeps the parent visible in that case so
-  /// the match isn't hidden inside a collapsed branch.
-  bool subtreeHasMatch(String id) {
-    return childrenOf(id).any(
-      (c) => matchesFilters(c) || subtreeHasMatch(c.id),
-    );
-  }
-
-  bool isExpanded(String id) => expandedIds.contains(id);
-
-  void toggleExpanded(String id) {
-    if (expandedIds.contains(id)) {
-      expandedIds.remove(id);
-    } else {
-      expandedIds.add(id);
-    }
+  bool matchesSubFilters(CategoryModel c) {
+    final term = subSearch.value.trim().toLowerCase();
+    final matchesSearch =
+        term.isEmpty ||
+        c.name.toLowerCase().contains(term) ||
+        c.description.toLowerCase().contains(term);
+    final matchesStatus = switch (subStatusFilter.value) {
+      'active' => c.isActive,
+      'inactive' => !c.isActive,
+      _ => true,
+    };
+    final matchesGroup =
+        subGroupFilter.value.isEmpty ||
+        c.parentCategoryId == subGroupFilter.value;
+    return matchesSearch && matchesStatus && matchesGroup;
   }
 
   Future<void> addCategory(CategoryModel category) async {
     isSaving.value = true;
     try {
       await _repo.create(category);
-      if (category.parentCategoryId != null) {
-        expandedIds.add(category.parentCategoryId!);
-      }
     } finally {
       isSaving.value = false;
     }

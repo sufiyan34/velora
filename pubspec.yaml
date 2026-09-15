@@ -41,16 +41,16 @@ dependencies:
   flutter_launcher_icons: ^0.14.4
   google_fonts: ^8.2.1
   firebase_core: ^4.14.0
-  firebase_auth: ^6.6.1
+  
   cloud_firestore: ^6.9.0
   firebase_storage: ^13.5.0
   firebase_messaging: ^16.6.0
   cloud_functions: ^6.4.0
-  cached_network_image: ^3.4.1
+  cached_network_image: ^4.0.0
   image_picker: ^1.2.3
   file_picker: ^12.3.0
   flutter_svg: ^2.3.0
-  lottie: ^3.3.3
+  lottie: ^3.5.1
   shimmer: ^3.0.0
   flutter_rating_bar: ^4.0.1
   intl: ^0.20.3
@@ -68,6 +68,9 @@ dependencies:
   firebase_database: ^12.5.0
   payfast_web: ^1.0.0
   payfast: ^1.0.2
+  firebase_auth: ^6.7.0
+  model_viewer_plus: ^1.10.0
+  flutter_image_compress: ^2.5.1
 
 dev_dependencies:
   flutter_test:

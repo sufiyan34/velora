@@ -5,54 +5,63 @@ import '../../../../controllers/category_controller.dart';
 import '../../../../models/category_model.dart';
 import '../../../../theme/admin_theme.dart';
 
-/// Opens the add/edit dialog for a top-level category.
-/// Pass [category] to edit an existing one.
-Future<void> showCategoryFormDialog({
+/// Opens the add/edit dialog for a subcategory.
+///
+/// - Pass [subcategory] to edit an existing one.
+/// - Pass [presetGroupId] to pre-select a category group (e.g. when the
+///   admin taps "Add subcategory" from within a specific category's row).
+Future<void> showSubcategoryFormDialog({
   required BuildContext context,
   required CategoryController controller,
-  CategoryModel? category,
+  CategoryModel? subcategory,
+  String? presetGroupId,
 }) {
   return showDialog(
     context: context,
     barrierColor: Colors.black.withValues(alpha: 0.42),
-    builder: (_) =>
-        CategoryFormDialog(controller: controller, category: category),
+    builder: (_) => SubcategoryFormDialog(
+      controller: controller,
+      subcategory: subcategory,
+      presetGroupId: presetGroupId,
+    ),
   );
 }
 
-class CategoryFormDialog extends StatefulWidget {
-  const CategoryFormDialog({
+class SubcategoryFormDialog extends StatefulWidget {
+  const SubcategoryFormDialog({
     super.key,
     required this.controller,
-    this.category,
+    this.subcategory,
+    this.presetGroupId,
   });
 
   final CategoryController controller;
-  final CategoryModel? category;
+  final CategoryModel? subcategory;
+  final String? presetGroupId;
 
   @override
-  State<CategoryFormDialog> createState() => _CategoryFormDialogState();
+  State<SubcategoryFormDialog> createState() => _SubcategoryFormDialogState();
 }
 
-class _CategoryFormDialogState extends State<CategoryFormDialog> {
+class _SubcategoryFormDialogState extends State<SubcategoryFormDialog> {
   late final TextEditingController _name;
   late final TextEditingController _description;
   late final TextEditingController _sortOrder;
+  String? _groupId;
   bool _isActive = true;
   bool _saving = false;
   String? _error;
 
-  bool get _isEditing => widget.category != null;
+  bool get _isEditing => widget.subcategory != null;
 
   @override
   void initState() {
     super.initState();
-    final c = widget.category;
+    final c = widget.subcategory;
     _name = TextEditingController(text: c?.name ?? '');
     _description = TextEditingController(text: c?.description ?? '');
-    _sortOrder = TextEditingController(
-      text: (c?.sortOrder ?? widget.controller.topLevel().length).toString(),
-    );
+    _sortOrder = TextEditingController(text: (c?.sortOrder ?? 0).toString());
+    _groupId = c?.parentCategoryId ?? widget.presetGroupId;
     _isActive = c?.isActive ?? true;
   }
 
@@ -67,7 +76,11 @@ class _CategoryFormDialogState extends State<CategoryFormDialog> {
   Future<void> _save() async {
     final name = _name.text.trim();
     if (name.isEmpty) {
-      setState(() => _error = 'Give the category a name first.');
+      setState(() => _error = 'Give the subcategory a name first.');
+      return;
+    }
+    if (_groupId == null || _groupId!.isEmpty) {
+      setState(() => _error = 'Choose which category group this belongs to.');
       return;
     }
     setState(() {
@@ -76,12 +89,12 @@ class _CategoryFormDialogState extends State<CategoryFormDialog> {
     });
 
     final data = CategoryModel(
-      id: widget.category?.id ?? '',
+      id: widget.subcategory?.id ?? '',
       name: name,
       description: _description.text.trim(),
-      image: widget.category?.image ?? '',
-      parentCategoryId: null,
-      productCount: widget.category?.productCount ?? 0,
+      image: widget.subcategory?.image ?? '',
+      parentCategoryId: _groupId,
+      productCount: widget.subcategory?.productCount ?? 0,
       sortOrder: int.tryParse(_sortOrder.text.trim()) ?? 0,
       isActive: _isActive,
     );
@@ -96,13 +109,15 @@ class _CategoryFormDialogState extends State<CategoryFormDialog> {
     } catch (e) {
       setState(() {
         _saving = false;
-        _error = "Couldn't save this category. Please try again.";
+        _error = "Couldn't save this subcategory. Please try again.";
       });
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final groups = widget.controller.topLevel();
+
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: ConstrainedBox(
@@ -117,7 +132,7 @@ class _CategoryFormDialogState extends State<CategoryFormDialog> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    _isEditing ? 'Edit category' : 'Add category',
+                    _isEditing ? 'Edit subcategory' : 'Add subcategory',
                     style: AdminText.display(19),
                   ),
                   IconButton(
@@ -133,11 +148,37 @@ class _CategoryFormDialogState extends State<CategoryFormDialog> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _Field(
+                        label: 'Category group',
+                        hint: groups.isEmpty
+                            ? 'Add a category first — subcategories belong to one.'
+                            : 'Which category this subcategory sits under.',
+                        child: DropdownButtonFormField<String>(
+                          initialValue:
+                              (_groupId != null &&
+                                  groups.any((g) => g.id == _groupId))
+                              ? _groupId
+                              : null,
+                          isExpanded: true,
+                          hint: const Text('Select a category group'),
+                          items: groups
+                              .map(
+                                (g) => DropdownMenuItem<String>(
+                                  value: g.id,
+                                  child: Text(g.name),
+                                ),
+                              )
+                              .toList(),
+                          onChanged: groups.isEmpty
+                              ? null
+                              : (v) => setState(() => _groupId = v),
+                        ),
+                      ),
+                      _Field(
                         label: 'Name',
                         child: TextField(
                           controller: _name,
                           decoration: const InputDecoration(
-                            hintText: 'e.g. Women',
+                            hintText: 'e.g. Dresses',
                           ),
                         ),
                       ),
@@ -148,7 +189,7 @@ class _CategoryFormDialogState extends State<CategoryFormDialog> {
                           maxLines: 3,
                           decoration: const InputDecoration(
                             hintText:
-                                'Optional — shown on the category landing page',
+                                'Optional — shown on the subcategory landing page',
                           ),
                         ),
                       ),
@@ -209,7 +250,7 @@ class _CategoryFormDialogState extends State<CategoryFormDialog> {
                   ),
                   const SizedBox(width: 10),
                   AdminPrimaryButton(
-                    label: 'Save category',
+                    label: 'Save subcategory',
                     loading: _saving,
                     onPressed: _save,
                   ),

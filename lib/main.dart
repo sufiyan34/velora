@@ -1,3 +1,4 @@
+import 'package:e_commerce/bindings/initial_binding.dart';
 import 'package:e_commerce/constants/app_routes.dart';
 import 'package:e_commerce/constants/get_app_routes.dart';
 import 'package:e_commerce/splash_screen.dart';
@@ -30,7 +31,7 @@ class MyApp extends StatelessWidget {
         return GetMaterialApp(
           debugShowCheckedModeBanner: false,
           title: 'Velora',
-
+          initialBinding: InitialBinding(),
           theme: ThemeData(
             useMaterial3: true,
 

@@ -1,4 +1,5 @@
 import 'package:e_commerce/constants/app_routes.dart';
+import 'package:e_commerce/controllers/auth_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
@@ -656,20 +657,21 @@ class _LoginScreenState extends State<LoginScreen>
   // ==========================================================
   // LOGIN
   // ==========================================================
-
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) {
       return;
     }
 
-    // Firebase authentication will be connected here.
-    //
-    // Example later:
-    //
-    await FirebaseAuth.instance.signInWithEmailAndPassword(
+    final authController = Get.find<AuthController>();
+
+    final success = await authController.login(
       email: emailController.text.trim(),
-      password: passwordController.text.trim(),
+      password: passwordController.text,
     );
+
+    if (!success) {
+      return;
+    }
 
     Get.offAllNamed(AppRoutes.home);
   }

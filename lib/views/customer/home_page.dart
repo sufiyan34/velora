@@ -152,7 +152,12 @@ class _DesktopHeader extends StatelessWidget {
 
           SizedBox(width: 12.w),
 
-          _HeaderIcon(icon: Iconsax.user, onTap: () {}),
+          _HeaderIcon(
+            icon: Iconsax.user,
+            onTap: () {
+              Get.toNamed(AppRoutes.profile);
+            },
+          ),
         ],
       ),
     );
@@ -577,7 +582,7 @@ class _ProductCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      onTap: () {},
+      onTap: () => Get.toNamed(AppRoutes.productDetails, arguments: product),
       borderRadius: BorderRadius.circular(16.r),
       child: Container(
         decoration: BoxDecoration(
