@@ -1,5 +1,5 @@
 import 'package:get/get.dart';
-
+import 'package:e_commerce/controllers/current_user_controller.dart';
 import '../controllers/auth_controller.dart';
 import '../controllers/cloudinary_media_controller.dart';
 import '../services/cloudinary/cloudinary_config.dart';
@@ -9,7 +9,10 @@ class InitialBinding extends Bindings {
   @override
   void dependencies() {
     Get.lazyPut<AuthController>(() => AuthController(), fenix: true);
-
+    Get.lazyPut<CurrentUserController>(
+      () => CurrentUserController(),
+      fenix: true,
+    );
     // Cloudinary configuration
     Get.lazyPut<CloudinaryConfig>(
       () => CloudinaryConfig.fromEnvironment(),

@@ -1,3 +1,4 @@
+import 'package:e_commerce/auth/access_denied_screen.dart';
 import 'package:e_commerce/views/customer/wishlist_screen.dart';
 
 class AppRoutes {
@@ -6,7 +7,7 @@ class AppRoutes {
   static const login = '/login';
   static const register = '/register';
   static const signUP = '/signUp';
-
+  static const accessDeniedScreen = '/access-denied-screen';
   // ========================= // Customer // =========================
   static const home = '/home';
 

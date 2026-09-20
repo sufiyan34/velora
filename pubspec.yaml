@@ -71,6 +71,7 @@ dependencies:
   firebase_auth: ^6.7.0
   model_viewer_plus: ^1.10.0
   flutter_image_compress: ^2.5.1
+  flutter_animate: ^4.5.2
 
 dev_dependencies:
   flutter_test:
