@@ -1,6 +1,7 @@
 import 'package:e_commerce/controllers/order_controller.dart';
 import 'package:e_commerce/models/order_model.dart';
 import 'package:flutter/material.dart';
+import 'package:e_commerce/constants/app_routes.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -145,6 +146,11 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
               if (order.canBeCancelled) ...[
                 SizedBox(height: 20.h),
                 _buildCancelButton(order),
+              ],
+
+              if (order.isDelivered) ...[
+                SizedBox(height: 20.h),
+                _buildReturnButton(order),
               ],
             ],
           ),
@@ -701,6 +707,36 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
         style: OutlinedButton.styleFrom(
           foregroundColor: Colors.red.shade600,
           side: BorderSide(color: Colors.red.shade300),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12.r),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildReturnButton(OrderModel order) {
+    return SizedBox(
+      width: double.infinity,
+      height: 48.h,
+      child: OutlinedButton.icon(
+        onPressed: () {
+          Get.toNamed(
+            AppRoutes.productReturn,
+            arguments: {'orderId': order.id},
+          );
+        },
+        icon: Icon(Iconsax.refresh_circle, size: 18.sp),
+        label: Text(
+          'Request Return',
+          style: GoogleFonts.poppins(
+            fontSize: 12.sp,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: const Color(0xFF6C4CF1),
+          side: const BorderSide(color: Color(0xFF6C4CF1)),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12.r),
           ),

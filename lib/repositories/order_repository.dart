@@ -278,6 +278,26 @@ class OrderRepository {
   }
 
   // ============================================================
+  // UPDATE ADMIN NOTE
+  // ============================================================
+  //
+  // Internal note only — never shown to the customer.
+
+  Future<void> updateAdminNote({
+    required String orderId,
+    required String note,
+  }) async {
+    if (orderId.trim().isEmpty) {
+      throw Exception('Order ID is required.');
+    }
+
+    await _ordersRef.child(orderId).update({
+      'adminNote': note.trim().isEmpty ? null : note.trim(),
+      'updatedAt': DateTime.now().toIso8601String(),
+    });
+  }
+
+  // ============================================================
   // DELETE ORDER
   // ============================================================
   //

@@ -1,11 +1,16 @@
 import 'package:e_commerce/auth/access_denied_screen.dart';
 import 'package:e_commerce/auth/admin_setup_screen.dart';
 import 'package:e_commerce/auth/login_screen.dart';
-
 import 'package:e_commerce/bindings/auth_binding.dart';
 import 'package:e_commerce/bindings/cart_binding.dart';
+import 'package:e_commerce/bindings/customer_category_binding.dart';
+
+import 'package:e_commerce/bindings/customer_product_listing_binding.dart';
+import 'package:e_commerce/bindings/deals_binding.dart';
 import 'package:e_commerce/bindings/home_binding.dart';
 import 'package:e_commerce/bindings/order_binding.dart';
+import 'package:e_commerce/bindings/product_section_listing_binding.dart';
+import 'package:e_commerce/bindings/return_binding.dart';
 import 'package:e_commerce/bindings/wishlist_binding.dart';
 
 import 'package:e_commerce/constants/app_routes.dart';
@@ -16,17 +21,24 @@ import 'package:e_commerce/splash_screen.dart';
 import 'package:e_commerce/testing/test_data_screen.dart';
 
 import 'package:e_commerce/views/admin/categories_screen.dart';
+import 'package:e_commerce/views/admin/dashboard_screen.dart';
 import 'package:e_commerce/views/admin/products_screen.dart';
 
 import 'package:e_commerce/views/customer/cart_screen.dart';
+import 'package:e_commerce/views/customer/categories_screen.dart';
 import 'package:e_commerce/views/customer/checkout_screen.dart';
+import 'package:e_commerce/views/customer/deals_screen.dart';
 import 'package:e_commerce/views/customer/home_page.dart';
 import 'package:e_commerce/views/customer/order_details_screen.dart';
 import 'package:e_commerce/views/customer/order_success_screen.dart';
 import 'package:e_commerce/views/customer/orders_screen.dart';
 import 'package:e_commerce/views/customer/product_details_screen.dart';
+import 'package:e_commerce/views/customer/product_listing_screen.dart';
+import 'package:e_commerce/views/customer/product_section_screen.dart';
 import 'package:e_commerce/views/customer/profile_screen.dart';
+import 'package:e_commerce/views/customer/return_screen.dart';
 import 'package:e_commerce/views/customer/signup_screen.dart';
+import 'package:e_commerce/views/customer/subcategory_screen.dart';
 import 'package:e_commerce/views/customer/wishlist_screen.dart';
 
 import 'package:get/get_navigation/src/routes/get_route.dart';
@@ -70,15 +82,45 @@ class GetAppRoutes {
       page: () => HomeScreen(),
       binding: HomeBinding(),
     ),
+    GetPage(
+      name: AppRoutes.subcategory,
+      page: () => SubcategoryScreen(),
+      binding: CustomerCategoryBinding(),
+    ),
+    GetPage(
+      name: AppRoutes.customerCategories,
+      page: () => const CustomerCategoriesScreen(),
+      binding: CustomerCategoryBinding(),
+    ),
+    GetPage(
+      name: AppRoutes.customerproducts,
+      page: () => ProductListingScreen(),
+      binding: CustomerProductListingBinding(),
+    ),
+    // -------------------------------------------------------------------------
+    // PRODUCT SECTION "VIEW ALL"
+    // Featured Products / New Arrivals / On Sale — Public
+    // -------------------------------------------------------------------------
+    GetPage(
+      name: AppRoutes.productSection,
+      page: () => ProductSectionScreen(),
+      binding: ProductSectionListingBinding(),
+    ),
 
+    // -------------------------------------------------------------------------
+    // DEALS
+    // Public
+    // -------------------------------------------------------------------------
+    GetPage(
+      name: AppRoutes.deals,
+      page: () => DealsScreen(),
+      binding: DealsBinding(),
+    ),
     // -------------------------------------------------------------------------
     // PRODUCT DETAILS
     // Public
     // -------------------------------------------------------------------------
-    GetPage(
-      name: AppRoutes.productDetails,
-      page: () => const ProductDetailsScreen(),
-    ),
+    GetPage(name: AppRoutes.productDetails, page: () => ProductDetailsScreen()),
 
     // -------------------------------------------------------------------------
     // ORDERS
@@ -154,7 +196,16 @@ class GetAppRoutes {
       binding: WishlistBinding(),
       middlewares: [PermissionMiddleware()],
     ),
-
+    // -------------------------------------------------------------------------
+    // PRODUCT RETURN
+    // Customer / Admin / Super Admin
+    // -------------------------------------------------------------------------
+    GetPage(
+      name: AppRoutes.productReturn,
+      page: () => const ReturnScreen(),
+      binding: ReturnBinding(),
+      middlewares: [PermissionMiddleware()],
+    ),
     // =========================================================================
     // TEST / DEVELOPMENT
     // =========================================================================
@@ -189,8 +240,23 @@ class GetAppRoutes {
       middlewares: [PermissionMiddleware()],
     ),
     GetPage(
+      name: AppRoutes.adminDashboard,
+      page: () => DashboardScreen(),
+      middlewares: [PermissionMiddleware()],
+    ),
+    GetPage(
       name: AppRoutes.accessDeniedScreen,
       page: () => AccessDeniedScreen(),
+    ),
+    GetPage(
+      name: AppRoutes.adminDashboard,
+      page: () => const DashboardScreen(),
+      middlewares: [PermissionMiddleware()],
+    ),
+    GetPage(
+      name: AppRoutes.adminOrders,
+      page: () => const OrdersScreen(),
+      middlewares: [PermissionMiddleware()],
     ),
   ];
 }

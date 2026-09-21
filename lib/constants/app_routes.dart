@@ -1,6 +1,3 @@
-import 'package:e_commerce/auth/access_denied_screen.dart';
-import 'package:e_commerce/views/customer/wishlist_screen.dart';
-
 class AppRoutes {
   // ========================= // General // =========================
   static const splash = '/';
@@ -10,7 +7,9 @@ class AppRoutes {
   static const accessDeniedScreen = '/access-denied-screen';
   // ========================= // Customer // =========================
   static const home = '/home';
-
+  static const productSection = '/product-section';
+  static const deals = '/deals';
+  static const productReturn = '/product-return';
   static const products = '/products';
   static const productDetails = '/product-details';
   static const categories = '/categories';
@@ -22,6 +21,10 @@ class AppRoutes {
   static const myOrders = '/my-orders';
   static const profile = '/profile';
   static const wishlistScreen = '/wishlist';
+  static const customerCategories = '/customer-categories';
+  static const subcategory = '/subcategory';
+  // Product Listing
+  static const customerproducts = '/customer-products';
   // ========================= // Admin // =========================
   static const adminDashboard = '/admin-dashboard';
   static const adminOrders = '/admin-orders';

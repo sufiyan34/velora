@@ -5,6 +5,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:e_commerce/constants/app_routes.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -106,11 +107,7 @@ class ProfileScreen extends StatelessWidget {
                     title: 'My Orders',
                     subtitle: 'View your orders and their status',
                     onTap: () {
-                      Get.snackbar(
-                        'Coming Soon',
-                        'Orders screen will be connected next.',
-                        snackPosition: SnackPosition.BOTTOM,
-                      );
+                      Get.toNamed(AppRoutes.orders);
                     },
                   ),
                   _profileTile(
@@ -118,11 +115,15 @@ class ProfileScreen extends StatelessWidget {
                     title: 'Wishlist',
                     subtitle: 'Products you saved',
                     onTap: () {
-                      Get.snackbar(
-                        'Coming Soon',
-                        'Wishlist screen will be connected next.',
-                        snackPosition: SnackPosition.BOTTOM,
-                      );
+                      Get.toNamed(AppRoutes.wishlistScreen);
+                    },
+                  ),
+                  _profileTile(
+                    icon: Iconsax.refresh_circle,
+                    title: 'My Returns',
+                    subtitle: 'Request or track a return',
+                    onTap: () {
+                      Get.toNamed(AppRoutes.productReturn);
                     },
                   ),
                 ],

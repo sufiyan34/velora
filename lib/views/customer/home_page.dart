@@ -11,6 +11,7 @@ import 'package:iconsax/iconsax.dart';
 
 import '../../../models/category_model.dart';
 import '../../../models/product_model.dart';
+import '../../utills/customer_skeleton.dart';
 
 class HomeScreen extends GetView<HomeController> {
   const HomeScreen({super.key});
@@ -20,64 +21,76 @@ class HomeScreen extends GetView<HomeController> {
     return Scaffold(
       backgroundColor: const Color(0xFFF7F7F8),
       body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final isDesktop = constraints.maxWidth >= 900;
+        child: Obx(() {
+          // Only the very first load (no cached and no live data yet) gets
+          // the full-page skeleton — once anything is on screen we never
+          // want to yank it away for a spinner again.
+          if (controller.isInitialLoading) {
+            return const HomeSkeleton();
+          }
 
-            return CustomScrollView(
-              shrinkWrap: true,
-              slivers: [
-                SliverToBoxAdapter(
-                  child: isDesktop
-                      ? const _DesktopHeader()
-                      : const _MobileHeader(),
-                ),
+          return LayoutBuilder(
+            builder: (context, constraints) {
+              final isDesktop = constraints.maxWidth >= 900;
 
-                SliverToBoxAdapter(child: _SearchBar()),
-                SliverToBoxAdapter(
-                  child: Obx(() {
-                    if (controller.searchQuery.value.isEmpty) {
-                      return const SizedBox.shrink();
-                    }
-
-                    return _SearchResults();
-                  }),
-                ),
-                SliverToBoxAdapter(child: _HeroBanner()),
-
-                SliverToBoxAdapter(child: _CategorySection()),
-
-                SliverToBoxAdapter(
-                  child: _ProductSection(
-                    title: 'Featured Products',
-                    subtitle: 'Handpicked products just for you',
-                    products: controller.featuredProducts,
+              return CustomScrollView(
+                shrinkWrap: true,
+                slivers: [
+                  SliverToBoxAdapter(
+                    child: isDesktop
+                        ? const _DesktopHeader()
+                        : const _MobileHeader(),
                   ),
-                ),
 
-                SliverToBoxAdapter(child: _PromoBanner()),
+                  SliverToBoxAdapter(child: _SearchBar()),
+                  SliverToBoxAdapter(
+                    child: Obx(() {
+                      if (controller.searchQuery.value.isEmpty) {
+                        return const SizedBox.shrink();
+                      }
 
-                SliverToBoxAdapter(
-                  child: _ProductSection(
-                    title: 'New Arrivals',
-                    subtitle: 'Fresh products added recently',
-                    products: controller.newArrivals,
+                      return _SearchResults();
+                    }),
                   ),
-                ),
+                  SliverToBoxAdapter(child: _HeroBanner()),
 
-                SliverToBoxAdapter(
-                  child: _ProductSection(
-                    title: 'On Sale',
-                    subtitle: 'Grab your favorites at better prices',
-                    products: controller.saleProducts,
+                  SliverToBoxAdapter(child: _CategorySection()),
+
+                  SliverToBoxAdapter(
+                    child: _ProductSection(
+                      title: 'Featured Products',
+                      subtitle: 'Handpicked products just for you',
+                      sectionType: 'featured',
+                      products: controller.featuredProducts,
+                    ),
                   ),
-                ),
 
-                SliverToBoxAdapter(child: SizedBox(height: 100.h)),
-              ],
-            );
-          },
-        ),
+                  SliverToBoxAdapter(child: _PromoBanner()),
+
+                  SliverToBoxAdapter(
+                    child: _ProductSection(
+                      title: 'New Arrivals',
+                      subtitle: 'Fresh products added recently',
+                      sectionType: 'new',
+                      products: controller.newArrivals,
+                    ),
+                  ),
+
+                  SliverToBoxAdapter(
+                    child: _ProductSection(
+                      title: 'On Sale',
+                      subtitle: 'Grab your favorites at better prices',
+                      sectionType: 'sale',
+                      products: controller.saleProducts,
+                    ),
+                  ),
+
+                  SliverToBoxAdapter(child: SizedBox(height: 100.h)),
+                ],
+              );
+            },
+          );
+        }),
       ),
 
       bottomNavigationBar: LayoutBuilder(
@@ -126,11 +139,21 @@ class _DesktopHeader extends StatelessWidget {
             },
           ),
 
-          _HeaderItem(title: 'Categories', onTap: () {}),
+          _HeaderItem(
+            title: 'Categories',
+            onTap: () {
+              Get.toNamed(AppRoutes.customerCategories);
+            },
+          ),
 
           _HeaderItem(title: 'Shop', onTap: () {}),
 
-          _HeaderItem(title: 'Deals', onTap: () {}),
+          _HeaderItem(
+            title: 'Deals',
+            onTap: () {
+              Get.toNamed(AppRoutes.deals);
+            },
+          ),
 
           const Spacer(),
 
@@ -417,7 +440,10 @@ class _CategorySection extends GetView<HomeController> {
         padding: EdgeInsets.only(top: 28.h),
         child: Column(
           children: [
-            _SectionHeader(title: 'Categories', onTap: () {}),
+            _SectionHeader(
+              title: 'Categories',
+              onTap: () => Get.toNamed(AppRoutes.customerCategories),
+            ),
 
             SizedBox(height: 14.h),
 
@@ -450,7 +476,9 @@ class _CategoryCard extends StatelessWidget {
     return SizedBox(
       width: 90.w,
       child: InkWell(
-        onTap: () {},
+        onTap: () {
+          Get.toNamed(AppRoutes.subcategory, arguments: category);
+        },
         borderRadius: BorderRadius.circular(16.r),
         child: Column(
           children: [
@@ -504,11 +532,13 @@ class _CategoryCard extends StatelessWidget {
 class _ProductSection extends StatelessWidget {
   final String title;
   final String subtitle;
+  final String sectionType;
   final List<ProductModel> products;
 
   const _ProductSection({
     required this.title,
     required this.subtitle,
+    required this.sectionType,
     required this.products,
   });
 
@@ -522,7 +552,20 @@ class _ProductSection extends StatelessWidget {
       padding: EdgeInsets.only(top: 30.h),
       child: Column(
         children: [
-          _SectionHeader(title: title, subtitle: subtitle, onTap: () {}),
+          _SectionHeader(
+            title: title,
+            subtitle: subtitle,
+            onTap: () {
+              Get.toNamed(
+                AppRoutes.productSection,
+                arguments: {
+                  'type': sectionType,
+                  'title': title,
+                  'subtitle': subtitle,
+                },
+              );
+            },
+          ),
 
           SizedBox(height: 15.h),
 
@@ -960,53 +1003,59 @@ class _PromoBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: EdgeInsets.fromLTRB(18.w, 30.h, 18.w, 0),
-      child: Container(
-        width: double.infinity,
-        padding: EdgeInsets.all(20.w),
-        decoration: BoxDecoration(
-          color: const Color(0xFFEDEDED),
+      child: Material(
+        color: const Color(0xFFEDEDED),
+        borderRadius: BorderRadius.circular(18.r),
+        child: InkWell(
           borderRadius: BorderRadius.circular(18.r),
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'SPECIAL OFFER',
-                    style: GoogleFonts.poppins(
-                      fontSize: 10.sp,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 1.5,
-                    ),
+          onTap: () {
+            Get.toNamed(AppRoutes.deals);
+          },
+          child: Container(
+            width: double.infinity,
+            padding: EdgeInsets.all(20.w),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'SPECIAL OFFER',
+                        style: GoogleFonts.poppins(
+                          fontSize: 10.sp,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1.5,
+                        ),
+                      ),
+
+                      SizedBox(height: 5.h),
+
+                      Text(
+                        'Up to 40% OFF',
+                        style: GoogleFonts.poppins(
+                          fontSize: 21.sp,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+
+                      SizedBox(height: 3.h),
+
+                      Text(
+                        'Limited time deals on selected products.',
+                        style: GoogleFonts.poppins(
+                          fontSize: 10.sp,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                    ],
                   ),
+                ),
 
-                  SizedBox(height: 5.h),
-
-                  Text(
-                    'Up to 40% OFF',
-                    style: GoogleFonts.poppins(
-                      fontSize: 21.sp,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-
-                  SizedBox(height: 3.h),
-
-                  Text(
-                    'Limited time deals on selected products.',
-                    style: GoogleFonts.poppins(
-                      fontSize: 10.sp,
-                      color: Colors.grey.shade600,
-                    ),
-                  ),
-                ],
-              ),
+                Icon(Iconsax.discount_shape, size: 55.sp),
+              ],
             ),
-
-            Icon(Iconsax.discount_shape, size: 55.sp),
-          ],
+          ),
         ),
       ),
     );
@@ -1034,7 +1083,24 @@ class _MobileBottomNavigation extends StatelessWidget {
         fontWeight: FontWeight.w600,
       ),
       unselectedLabelStyle: GoogleFonts.poppins(fontSize: 10.sp),
-      onTap: (index) {},
+      onTap: (index) {
+        switch (index) {
+          case 1:
+            Get.toNamed(AppRoutes.customerCategories);
+            break;
+          case 2:
+            Get.toNamed(AppRoutes.wishlistScreen);
+            break;
+          case 3:
+            Get.toNamed(AppRoutes.cart);
+            break;
+          case 4:
+            Get.toNamed(AppRoutes.profile);
+            break;
+          default:
+            break;
+        }
+      },
       items: const [
         BottomNavigationBarItem(icon: Icon(Iconsax.home), label: 'Home'),
         BottomNavigationBarItem(

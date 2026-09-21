@@ -64,14 +64,12 @@ dependencies:
   responsive_builder: ^0.7.1
   firebase_ai: ^4.0.0
   fl_chart: ^1.2.0
-  permission_handler: ^13.0.2
   firebase_database: ^12.5.0
-  payfast_web: ^1.0.0
-  payfast: ^1.0.2
   firebase_auth: ^6.7.0
   model_viewer_plus: ^1.10.0
   flutter_image_compress: ^2.5.1
   flutter_animate: ^4.5.2
+  xpay_element_flutter: ^7.0.5
 
 dev_dependencies:
   flutter_test:

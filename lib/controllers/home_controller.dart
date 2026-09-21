@@ -2,10 +2,11 @@ import 'dart:async';
 
 import 'package:get/get.dart';
 
-import '../../../models/category_model.dart';
-import '../../../models/product_model.dart';
-import '../../../repositories/category_repository.dart';
-import '../../../repositories/product_repository.dart';
+import '../models/category_model.dart';
+import '../models/product_model.dart';
+import '../repositories/category_repository.dart';
+import '../repositories/product_repository.dart';
+import '../services/local_cache_service.dart';
 
 class HomeController extends GetxController {
   HomeController({
@@ -16,6 +17,15 @@ class HomeController extends GetxController {
 
   final ProductRepository _productRepository;
   final CategoryRepository _categoryRepository;
+
+  /// Home only shows curated sections (featured / new / on sale), so it
+  /// never needs the whole catalog — just a recent window of it. This is
+  /// the main fix for the slow Home load: before, every launch downloaded
+  /// every product in the store.
+  static const int _homeProductLimit = 60;
+
+  static const String _productsCacheKey = 'cache_home_products';
+  static const String _categoriesCacheKey = 'cache_home_categories';
 
   final RxList<ProductModel> products = <ProductModel>[].obs;
   final RxList<CategoryModel> categories = <CategoryModel>[].obs;
@@ -33,36 +43,96 @@ class HomeController extends GetxController {
   void onInit() {
     super.onInit();
 
+    _loadFromCache();
     _listenToProducts();
     _listenToCategories();
   }
 
+  /// Paints the screen instantly from whatever was cached on the last
+  /// successful load, so returning users almost never see the skeleton —
+  /// the live listeners below silently replace this the moment fresh data
+  /// arrives.
+  Future<void> _loadFromCache() async {
+    final cachedProducts = await LocalCacheService.readJson(_productsCacheKey);
+
+    if (cachedProducts is List && cachedProducts.isNotEmpty && products.isEmpty) {
+      final parsed = cachedProducts
+          .whereType<Map>()
+          .map(
+            (item) => ProductModel.fromMap(Map<String, dynamic>.from(item)),
+          )
+          .where((product) => product.isActive)
+          .toList();
+
+      if (parsed.isNotEmpty) {
+        products.assignAll(parsed);
+        isLoadingProducts.value = false;
+      }
+    }
+
+    final cachedCategories = await LocalCacheService.readJson(
+      _categoriesCacheKey,
+    );
+
+    if (cachedCategories is List &&
+        cachedCategories.isNotEmpty &&
+        categories.isEmpty) {
+      final parsed = cachedCategories
+          .whereType<Map>()
+          .map(
+            (item) => CategoryModel.fromMap(Map<String, dynamic>.from(item)),
+          )
+          .where((category) => category.isActive && category.isTopLevel)
+          .toList();
+
+      if (parsed.isNotEmpty) {
+        categories.assignAll(parsed);
+        isLoadingCategories.value = false;
+      }
+    }
+  }
+
   void _listenToProducts() {
-    isLoadingProducts.value = true;
     productError.value = '';
 
-    _productsSubscription = _productRepository.watchAll().listen(
-      (items) {
-        products.assignAll(items.where((product) => product.isActive));
+    _productsSubscription = _productRepository
+        .watchLatest(limit: _homeProductLimit)
+        .listen(
+          (items) {
+            products.assignAll(items.where((product) => product.isActive));
 
-        isLoadingProducts.value = false;
-      },
-      onError: (error) {
-        isLoadingProducts.value = false;
-        productError.value = error.toString();
-      },
-    );
+            isLoadingProducts.value = false;
+
+            // Write-through cache for the next cold start.
+            LocalCacheService.saveJson(
+              _productsCacheKey,
+              items.map((product) => product.toMap()).toList(),
+            );
+          },
+          onError: (error) {
+            isLoadingProducts.value = false;
+            productError.value = error.toString();
+          },
+        );
   }
 
   void _listenToCategories() {
-    isLoadingCategories.value = true;
     categoryError.value = '';
 
     _categoriesSubscription = _categoryRepository.watchAll().listen(
       (items) {
-        categories.assignAll(items.where((category) => category.isActive));
+        categories.assignAll(
+          items.where(
+            (category) => category.isActive && category.isTopLevel,
+          ),
+        );
 
         isLoadingCategories.value = false;
+
+        LocalCacheService.saveJson(
+          _categoriesCacheKey,
+          items.map((category) => category.toMap()).toList(),
+        );
       },
       onError: (error) {
         isLoadingCategories.value = false;
@@ -139,6 +209,13 @@ class HomeController extends GetxController {
 
   bool get isLoading {
     return isLoadingProducts.value || isLoadingCategories.value;
+  }
+
+  /// True only while there is neither cached nor live data yet to show —
+  /// this is the signal the Home screen uses to display the full-page
+  /// skeleton instead of an empty section.
+  bool get isInitialLoading {
+    return isLoading && products.isEmpty && categories.isEmpty;
   }
 
   bool get hasProducts => products.isNotEmpty;

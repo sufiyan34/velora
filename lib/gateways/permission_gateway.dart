@@ -25,7 +25,8 @@ enum AppPermission {
 
   viewOrders,
   viewOrderDetails,
-
+  viewReturns,
+  requestReturn,
   viewProfile,
   editProfile,
 
@@ -109,6 +110,8 @@ class PermissionGateway {
       case AppPermission.placeOrder:
       case AppPermission.viewOrders:
       case AppPermission.viewOrderDetails:
+      case AppPermission.viewReturns:
+      case AppPermission.requestReturn:
       case AppPermission.viewProfile:
       case AppPermission.editProfile:
       case AppPermission.viewAddresses:
@@ -201,7 +204,12 @@ class PermissionGateway {
 
       case AppRoutes.orderDetails:
         return AppPermission.viewOrderDetails;
+      case AppRoutes.productReturn:
+        return AppPermission.viewReturns;
 
+      case AppRoutes.deals:
+      case AppRoutes.productSection:
+        return AppPermission.viewProducts;
       case AppRoutes.profile:
         return AppPermission.viewProfile;
 

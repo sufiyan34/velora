@@ -1,6 +1,7 @@
 import 'package:e_commerce/constants/app_routes.dart';
 import 'package:e_commerce/controllers/auth_controller.dart';
 import 'package:e_commerce/controllers/cart_controller.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
@@ -8,6 +9,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:e_commerce/controllers/order_controller.dart';
 import 'package:e_commerce/models/order_model.dart';
+import 'package:e_commerce/models/payment_model.dart';
+import 'package:e_commerce/services/payment_service.dart';
 
 class CheckoutScreen extends StatefulWidget {
   const CheckoutScreen({super.key});
@@ -31,6 +34,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   final postalCodeController = TextEditingController();
 
   String paymentMethod = 'Cash on Delivery';
+  PaymentGateway selectedGateway = PaymentGateway.stripe;
+  bool _processingPayment = false;
 
   @override
   void dispose() {
@@ -229,10 +234,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 SizedBox(height: 10.h),
 
                 _PaymentOption(
-                  title: 'Card Payment',
-                  subtitle: 'Visa, Mastercard and other cards',
+                  title: 'Online Payment',
+                  subtitle: 'Pay securely by card or local gateway',
                   icon: Iconsax.card,
-                  value: 'Card Payment',
+                  value: 'Online Payment',
                   groupValue: paymentMethod,
                   onChanged: (value) {
                     setState(() {
@@ -240,6 +245,42 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     });
                   },
                 ),
+
+                if (paymentMethod == 'Online Payment') ...[
+                  SizedBox(height: 14.h),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Choose payment gateway',
+                      style: GoogleFonts.poppins(
+                        fontSize: 10.sp,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey.shade700,
+                      ),
+                    ),
+                  ),
+                  SizedBox(height: 8.h),
+                  Wrap(
+                    spacing: 8.w,
+                    runSpacing: 8.h,
+                    children: PaymentGateway.values.map((gateway) {
+                      final isSelected = selectedGateway == gateway;
+                      return ChoiceChip(
+                        label: Text(
+                          gateway.title,
+                          style: GoogleFonts.poppins(
+                            fontSize: 10.sp,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        selected: isSelected,
+                        onSelected: (_) {
+                          setState(() => selectedGateway = gateway);
+                        },
+                      );
+                    }).toList(),
+                  ),
+                ],
               ],
             ),
           ),
@@ -253,10 +294,19 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             width: double.infinity,
             height: 50.h,
             child: ElevatedButton.icon(
-              onPressed: _placeOrder,
-              icon: Icon(Iconsax.tick_circle, size: 18.sp),
+              onPressed: _processingPayment ? null : _placeOrder,
+              icon: _processingPayment
+                  ? SizedBox(
+                      width: 18.sp,
+                      height: 18.sp,
+                      child: const CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : Icon(Iconsax.tick_circle, size: 18.sp),
               label: Text(
-                'Place Order',
+                _processingPayment ? 'Processing...' : 'Place Order',
                 style: GoogleFonts.poppins(
                   fontSize: 12.sp,
                   fontWeight: FontWeight.w600,
@@ -398,13 +448,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   // ===========================================================================
 
   Future<void> _placeOrder() async {
+    if (_processingPayment) return;
+
     if (!_formKey.currentState!.validate()) {
       return;
     }
-
-    // ----------------------------------------------------------
-    // CHECK LOGIN
-    // ----------------------------------------------------------
 
     final String userId = authController.userId;
 
@@ -414,14 +462,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         'Please login before placing an order.',
         snackPosition: SnackPosition.BOTTOM,
       );
-
       Get.toNamed(AppRoutes.login);
       return;
     }
-
-    // ----------------------------------------------------------
-    // CHECK CART
-    // ----------------------------------------------------------
 
     if (cartController.isEmpty) {
       Get.snackbar(
@@ -432,139 +475,173 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       return;
     }
 
-    // ----------------------------------------------------------
-    // PAYMENT
-    // ----------------------------------------------------------
+    setState(() => _processingPayment = true);
 
-    // For now we create real orders only for COD.
-    // Stripe / PayFast will be connected separately.
-    if (paymentMethod != 'Cash on Delivery') {
+    try {
+      final List<OrderItem> orderItems = cartController.items.map((cartItem) {
+        return OrderItem(
+          productId: cartItem.productId,
+          productName: cartItem.productName,
+          productImage: cartItem.productImage,
+          price: cartItem.price,
+          quantity: cartItem.quantity,
+          variationId: cartItem.variationId,
+          variationName: cartItem.variationName,
+          variationValue: cartItem.variationValue,
+        );
+      }).toList();
+
+      final ShippingAddress shippingAddress = ShippingAddress(
+        fullName: nameController.text.trim(),
+        phone: phoneController.text.trim(),
+        address: addressController.text.trim(),
+        city: cityController.text.trim(),
+        postalCode: postalCodeController.text.trim(),
+        country: 'Pakistan',
+      );
+
+      final bool isCod = paymentMethod == 'Cash on Delivery';
+      final String storedPaymentMethod = isCod
+          ? 'Cash on Delivery'
+          : '${selectedGateway.title} (Online)';
+
+      final OrderModel order = OrderModel(
+        id: '',
+        userId: userId,
+        items: orderItems,
+        subtotal: cartController.subtotal,
+        shippingFee: cartController.shipping,
+        discount: 0,
+        total: cartController.total,
+        currency: 'PKR',
+        paymentMethod: storedPaymentMethod,
+        paymentStatus: 'pending',
+        transactionId: null,
+        orderStatus: 'pending',
+        shippingAddress: shippingAddress,
+      );
+
+      final OrderModel? createdOrder = await orderController.createOrder(order);
+
+      if (createdOrder == null) {
+        return;
+      }
+
+      // COD does not need a payment gateway.
+      if (isCod) {
+        cartController.clearCart();
+        _showOrderSuccess(createdOrder);
+        return;
+      }
+
+      final String platform = kIsWeb
+          ? 'web'
+          : defaultTargetPlatform == TargetPlatform.iOS
+          ? 'ios'
+          : 'android';
+
+      final PaymentSession session =
+          await PaymentService.createPaymentSession(
+            order: createdOrder,
+            gateway: selectedGateway,
+            customerName: nameController.text.trim(),
+            customerEmail:
+                authController.currentUser?.email ??
+                authController.currentFirebaseUser?.email ??
+                '',
+            customerPhone: phoneController.text.trim(),
+            platform: platform,
+          );
+
+      final PaymentResult paymentResult = await PaymentService.pay(
+        session: session,
+        gateway: selectedGateway,
+        customerName: nameController.text.trim(),
+      );
+
+      if (paymentResult.pending) {
+        Get.snackbar(
+          'Payment Pending',
+          paymentResult.message ??
+              'Your payment is being processed. You can track the order from My Orders.',
+          snackPosition: SnackPosition.BOTTOM,
+          duration: const Duration(seconds: 5),
+        );
+        Get.offNamed(AppRoutes.orders);
+        return;
+      }
+
+      if (!paymentResult.success) {
+        if (paymentResult.transactionId != null) {
+          await PaymentService.verifyPayment(
+            orderId: createdOrder.id,
+            gateway: selectedGateway,
+            transactionId: paymentResult.transactionId,
+          );
+        }
+
+        Get.snackbar(
+          'Payment Failed',
+          paymentResult.message ?? 'The payment was not completed.',
+          snackPosition: SnackPosition.BOTTOM,
+        );
+        return;
+      }
+
+      // The client-side SDK only tells us that the payment flow completed.
+      // The backend re-checks the actual gateway transaction before marking it paid.
+      final PaymentResult verification = await PaymentService.verifyPayment(
+        orderId: createdOrder.id,
+        gateway: selectedGateway,
+        transactionId: paymentResult.transactionId ?? session.transactionId,
+      );
+
+      if (verification.success) {
+        cartController.clearCart();
+        _showOrderSuccess(createdOrder.copyWith(paymentStatus: 'paid'));
+        return;
+      }
+
+      if (verification.pending) {
+        Get.snackbar(
+          'Payment Verification Pending',
+          verification.message ??
+              'The payment was submitted and is waiting for gateway confirmation.',
+          snackPosition: SnackPosition.BOTTOM,
+          duration: const Duration(seconds: 5),
+        );
+        Get.offNamed(AppRoutes.orders);
+        return;
+      }
+
       Get.snackbar(
-        'Payment Coming Soon',
-        'Online card payment will be connected next.',
+        'Payment Not Confirmed',
+        verification.message ?? 'The gateway could not confirm this payment.',
         snackPosition: SnackPosition.BOTTOM,
       );
-      return;
-    }
-
-    // ----------------------------------------------------------
-    // CONVERT CART ITEMS → ORDER ITEMS
-    // ----------------------------------------------------------
-
-    final List<OrderItem> orderItems = cartController.items.map((cartItem) {
-      return OrderItem(
-        productId: cartItem.productId,
-        productName: cartItem.productName,
-        productImage: cartItem.productImage,
-        price: cartItem.price,
-        quantity: cartItem.quantity,
-        variationId: cartItem.variationId,
-        variationName: cartItem.variationName,
-        variationValue: cartItem.variationValue,
+    } catch (error) {
+      Get.snackbar(
+        'Payment Error',
+        error.toString(),
+        snackPosition: SnackPosition.BOTTOM,
+        duration: const Duration(seconds: 6),
       );
-    }).toList();
-
-    // ----------------------------------------------------------
-    // SHIPPING ADDRESS
-    // ----------------------------------------------------------
-
-    final ShippingAddress shippingAddress = ShippingAddress(
-      fullName: nameController.text.trim(),
-      phone: phoneController.text.trim(),
-      address: addressController.text.trim(),
-      city: cityController.text.trim(),
-      postalCode: postalCodeController.text.trim(),
-      country: 'Pakistan',
-    );
-
-    // ----------------------------------------------------------
-    // CREATE ORDER
-    // ----------------------------------------------------------
-
-    final OrderModel order = OrderModel(
-      id: '',
-      userId: userId,
-      items: orderItems,
-      subtotal: cartController.subtotal,
-      shippingFee: cartController.shipping,
-      discount: 0,
-      total: cartController.total,
-      currency: 'PKR',
-      paymentMethod: paymentMethod,
-      paymentStatus: 'pending',
-      transactionId: null,
-      orderStatus: 'pending',
-      shippingAddress: shippingAddress,
-    );
-
-    // ----------------------------------------------------------
-    // SAVE TO FIREBASE
-    // ----------------------------------------------------------
-
-    final createdOrder = await orderController.createOrder(order);
-
-    if (createdOrder == null) {
-      return;
+    } finally {
+      if (mounted) {
+        setState(() => _processingPayment = false);
+      }
     }
+  }
 
-    // ----------------------------------------------------------
-    // CLEAR CART
-    // ----------------------------------------------------------
-
-    cartController.clearCart();
-
-    // ----------------------------------------------------------
-    // SUCCESS
-    // ----------------------------------------------------------
-
+  void _showOrderSuccess(OrderModel order) {
     Get.offNamed(
       AppRoutes.orderSuccess,
       arguments: {
-        'orderId': createdOrder.id,
-        'total': createdOrder.total,
-        'paymentMethod': createdOrder.paymentMethod,
+        'orderId': order.id,
+        'total': order.total,
+        'paymentMethod': order.paymentMethod,
       },
     );
-    // Get.dialog(
-    //   PopScope(
-    //     canPop: false,
-    //     child: AlertDialog(
-    //       title: Row(
-    //         children: [
-    //           const Icon(Iconsax.tick_circle, color: Colors.green),
-    //           const SizedBox(width: 10),
-    //           Text(
-    //             'Order Placed!',
-    //             style: GoogleFonts.poppins(fontWeight: FontWeight.w700),
-    //           ),
-    //         ],
-    //       ),
-    //       content: Text(
-    //         'Your order has been placed successfully.\n\n'
-    //         'Order ID:\n${createdOrder.id}\n\n'
-    //         'Total: PKR ${createdOrder.total.toStringAsFixed(0)}\n\n'
-    //         'Payment: Cash on Delivery',
-    //         style: GoogleFonts.poppins(fontSize: 13, height: 1.6),
-    //       ),
-    //       actions: [
-    //         TextButton(
-    //           onPressed: () {
-    //             Get.back();
-    //             Get.offAllNamed(AppRoutes.home);
-    //           },
-    //           child: Text(
-    //             'Continue Shopping',
-    //             style: GoogleFonts.poppins(
-    //               color: const Color(0xFF6846E8),
-    //               fontWeight: FontWeight.w600,
-    //             ),
-    //           ),
-    //         ),
-    //       ],
-    //     ),
-    //   ),
-    //   barrierDismissible: false,
-    // );
   }
   // ===========================================================================
   // SECTION TITLE
