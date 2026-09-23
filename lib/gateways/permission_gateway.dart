@@ -27,6 +27,8 @@ enum AppPermission {
   viewOrderDetails,
   viewReturns,
   requestReturn,
+  viewComplaints,
+  submitComplaint,
   viewProfile,
   editProfile,
 
@@ -54,6 +56,7 @@ enum AppPermission {
 
   manageReviews,
   manageReturns,
+  manageComplaints,
 
   manageChat,
   manageReports,
@@ -112,6 +115,8 @@ class PermissionGateway {
       case AppPermission.viewOrderDetails:
       case AppPermission.viewReturns:
       case AppPermission.requestReturn:
+      case AppPermission.viewComplaints:
+      case AppPermission.submitComplaint:
       case AppPermission.viewProfile:
       case AppPermission.editProfile:
       case AppPermission.viewAddresses:
@@ -138,6 +143,7 @@ class PermissionGateway {
       case AppPermission.manageBanners:
       case AppPermission.manageReviews:
       case AppPermission.manageReturns:
+      case AppPermission.manageComplaints:
       case AppPermission.manageChat:
       case AppPermission.manageReports:
       case AppPermission.manageNotifications:
@@ -207,6 +213,9 @@ class PermissionGateway {
       case AppRoutes.productReturn:
         return AppPermission.viewReturns;
 
+      case AppRoutes.complaint:
+        return AppPermission.viewComplaints;
+
       case AppRoutes.deals:
       case AppRoutes.productSection:
         return AppPermission.viewProducts;
@@ -223,6 +232,12 @@ class PermissionGateway {
       case AppRoutes.adminOrders:
       case AppRoutes.dispatchedOrders:
         return AppPermission.manageOrders;
+
+      case AppRoutes.adminComplaints:
+        return AppPermission.manageComplaints;
+
+      case AppRoutes.adminReturns:
+        return AppPermission.manageReturns;
 
       case AppRoutes.adminProducts:
       case AppRoutes.addProduct:

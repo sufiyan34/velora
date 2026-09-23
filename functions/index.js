@@ -53,7 +53,7 @@ const XPAY_API_KEY = defineSecret('XPAY_API_KEY');
 const XPAY_SIGNATURE_SECRET = defineSecret('XPAY_SIGNATURE_SECRET');
 const XPAY_WEBHOOK_SECRET = defineSecret('XPAY_WEBHOOK_SECRET');
 const XPAY_BASE_URL = defineString('XPAY_BASE_URL', {
-  default: 'https://api.xpay.pk',
+  default: 'https://xstak-pay-stg.xstak.com',
 });
 const XPAY_PUBLIC_KEY = defineString('XPAY_PUBLIC_KEY', { default: '' });
 const XPAY_ACCOUNT_ID = defineString('XPAY_ACCOUNT_ID', { default: '' });
@@ -300,22 +300,106 @@ async function xpayRequest(path, payload) {
   return data;
 }
 
-async function createXPaySession({ orderId, order, customer }) {
+async function createXPaySession({ orderId, order, customer, platform }) {
+  const amount = Number(Number(order.total).toFixed(2));
+  const currency = clean(order.currency).toUpperCase();
+
+  const customerName =
+    clean(customer?.name) ||
+    clean(order.shippingAddress?.fullName) ||
+    'Velora Customer';
+  const customerEmail = clean(customer?.email);
+  const customerPhone =
+    clean(customer?.phone) ||
+    clean(order.shippingAddress?.phone);
+
+  // XPay's payment-link API requires a customer name and either
+  // an email or phone number.
+  if (!customerEmail && !customerPhone) {
+    throw new HttpsError(
+      'invalid-argument',
+      'XPay requires the customer email or phone number.',
+    );
+  }
+
+  // -------------------------------------------------------------------------
+  // WEB
+  // -------------------------------------------------------------------------
+  // Flutter Web uses XPay's hosted payment-link flow.
+  if (platform === 'web') {
+    const payload = {
+      order: {
+        id: orderId,
+        currency,
+        order_amount: amount,
+      },
+      customer: {
+        name: customerName,
+        email: customerEmail,
+        phone: customerPhone,
+      },
+      metadata: {
+        order_reference: orderId,
+      },
+      description: `Velora order ${orderId}`,
+    };
+
+    const data = await xpayRequest('/public/v1/payment/link', payload);
+    const paymentLink = clean(
+      data.payment_link ||
+        data.paymentLink ||
+        data.data?.payment_link ||
+        data.data?.paymentLink,
+    );
+
+    if (!paymentLink) {
+      throw new Error(
+        `XPay did not return a payment link: ${JSON.stringify(data)}`,
+      );
+    }
+
+    const checkoutUrl = /^https?:\/\//i.test(paymentLink)
+      ? paymentLink
+      : `https://${paymentLink}`;
+
+    // A payment link is not the final payment-intent ID. The authoritative
+    // transaction ID will be written when the XPay webhook/reverification
+    // resolves the payment intent.
+    const transactionId = `xpay_link_${orderId}`;
+
+    await updateOrderPayment({
+      orderId,
+      paymentStatus: 'pending',
+      transactionId,
+    });
+
+    return {
+      gateway: 'xpay',
+      type: 'hosted_checkout',
+      transactionId,
+      checkoutUrl,
+    };
+  }
+
+  // -------------------------------------------------------------------------
+  // ANDROID / IOS
+  // -------------------------------------------------------------------------
   const payload = {
-    amount: Number(Number(order.total).toFixed(2)),
-    currency: clean(order.currency).toUpperCase(),
-    payment_method_types: ['card'],
+    amount,
+    currency,
+    payment_method_types: 'card',
     customer: {
-      name: clean(customer?.name) || clean(order.shippingAddress?.fullName),
-      email: clean(customer?.email),
-      phone: clean(customer?.phone) || clean(order.shippingAddress?.phone),
+      name: customerName,
+      email: customerEmail,
+      phone: customerPhone,
     },
     shipping: {
-      name: clean(order.shippingAddress?.fullName),
-      address: clean(order.shippingAddress?.address),
+      address1: clean(order.shippingAddress?.address),
       city: clean(order.shippingAddress?.city),
-      postal_code: clean(order.shippingAddress?.postalCode),
-      country: 'PK',
+      country: 'Pakistan',
+      province: clean(order.shippingAddress?.province),
+      zip: clean(order.shippingAddress?.postalCode),
+      shipping_method: 'Standard',
     },
     metadata: {
       order_reference: orderId,
@@ -332,14 +416,19 @@ async function createXPaySession({ orderId, order, customer }) {
       data.pi_client_secret ||
       data.client_secret,
   );
+
+  // XPay's payment-intent identifier is returned as `_id`.
   const paymentIntentId = clean(
-    source.pi_id ||
+    source._id ||
+      source.pi_id ||
       source.payment_intent_id ||
       source.paymentIntentId ||
       source.id ||
+      data._id ||
       data.pi_id ||
       data.payment_intent_id,
   );
+
   const encryptionKey = clean(
     source.encryptionKey ||
       source.encryption_key ||
@@ -349,7 +438,9 @@ async function createXPaySession({ orderId, order, customer }) {
   );
 
   if (!clientSecret || !paymentIntentId || !encryptionKey) {
-    throw new Error(`XPay did not return the fields required by the Flutter Element: ${JSON.stringify(data)}`);
+    throw new Error(
+      `XPay did not return the fields required by the Flutter Element: ${JSON.stringify(data)}`,
+    );
   }
 
   await updateOrderPayment({
@@ -357,13 +448,6 @@ async function createXPaySession({ orderId, order, customer }) {
     paymentStatus: 'pending',
     transactionId: paymentIntentId,
   });
-
-  const configuredWebUrl = XPAY_WEB_CHECKOUT_URL.value();
-  const checkoutUrl = configuredWebUrl
-    ? configuredWebUrl
-        .replaceAll('{ORDER_ID}', encodeURIComponent(orderId))
-        .replaceAll('{AMOUNT}', encodeURIComponent(Number(Number(order.total).toFixed(2))))
-    : null;
 
   return {
     gateway: 'xpay',
@@ -373,7 +457,6 @@ async function createXPaySession({ orderId, order, customer }) {
     encryptionKey,
     publicKey: XPAY_PUBLIC_KEY.value(),
     accountId: XPAY_ACCOUNT_ID.value(),
-    checkoutUrl,
   };
 }
 
@@ -412,7 +495,7 @@ exports.createPaymentSession = onCall(
       return createPayFastSession({ orderId, order, customer });
     }
 
-    return createXPaySession({ orderId, order, customer });
+    return createXPaySession({ orderId, order, customer, platform });
   },
 );
 
@@ -562,39 +645,59 @@ exports.verifyPayment = onCall(
     }
 
     if (gateway === 'xpay') {
-      if (!transactionId) {
-        return { status: 'pending', message: 'XPay payment intent ID is missing.' };
+      if (!transactionId || !transactionId.startsWith('xpay_pi_')) {
+        return {
+          status: 'pending',
+          message: 'XPay payment intent ID is missing or not yet available.',
+        };
       }
 
       const paymentIntent = await retrieveXPayPaymentIntent(transactionId);
+      const expectedAmount = Number(Number(order.total).toFixed(2));
+      const actualAmount = Number(
+        paymentIntent.amount ?? paymentIntent.order_amount,
+      );
+      const expectedCurrency = clean(order.currency).toUpperCase();
+      const actualCurrency = clean(paymentIntent.currency).toUpperCase();
+
       const paid =
         xpayStatus(paymentIntent) === 'succeeded' &&
-        xpayOrderReference(paymentIntent) === orderId;
+        xpayOrderReference(paymentIntent) === orderId &&
+        actualAmount === expectedAmount &&
+        actualCurrency === expectedCurrency;
 
       if (paid) {
         await updateOrderPayment({
           orderId,
           paymentStatus: 'paid',
-          transactionId,
+          transactionId: paymentIntent._id || transactionId,
         });
         return {
           status: 'paid',
-          transactionId,
+          transactionId: paymentIntent._id || transactionId,
           message: 'XPay payment verified.',
         };
       }
 
       const status = xpayStatus(paymentIntent);
-      if (['failed', 'canceled', 'cancelled'].includes(status)) {
+      if (['failed', 'canceled', 'cancelled', 'voided'].includes(status)) {
         await updateOrderPayment({
           orderId,
           paymentStatus: 'failed',
-          transactionId,
+          transactionId: paymentIntent._id || transactionId,
         });
-        return { status: 'failed', transactionId, message: `XPay status: ${status}` };
+        return {
+          status: 'failed',
+          transactionId: paymentIntent._id || transactionId,
+          message: `XPay status: ${status}`,
+        };
       }
 
-      return { status: 'pending', transactionId, message: `XPay status: ${status}` };
+      return {
+        status: 'pending',
+        transactionId: paymentIntent._id || transactionId,
+        message: `XPay status: ${status || 'pending'}`,
+      };
     }
 
     // PayFast needs the transaction-status response from your merchant account.
@@ -858,9 +961,10 @@ exports.xpayWebhook = onRequest(
 
     try {
       const serialized = JSON.stringify(payload);
-      const matches = serialized.match(/pi_[A-Za-z0-9_-]+/g) || [];
+      const matches = serialized.match(/xpay_pi_[A-Za-z0-9_-]+/g) || [];
       const paymentIntentId = clean(
-        payload.pi_id ||
+        payload._id ||
+          payload.pi_id ||
           payload.payment_intent_id ||
           payload.paymentIntentId ||
           matches[0],

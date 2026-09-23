@@ -10,6 +10,7 @@ class AppRoutes {
   static const productSection = '/product-section';
   static const deals = '/deals';
   static const productReturn = '/product-return';
+  static const complaint = '/complaint';
   static const products = '/products';
   static const productDetails = '/product-details';
   static const categories = '/categories';
@@ -29,6 +30,9 @@ class AppRoutes {
   static const adminDashboard = '/admin-dashboard';
   static const adminOrders = '/admin-orders';
   static const dispatchedOrders = '/dispatched-orders';
+  static const adminComplaints = '/admin-complaints';
+  static const adminReturns = '/admin-returns';
+  static const adminDeals = '/admin-deals';
   static const adminProducts = '/admin-products';
   static const addProduct = '/add-product';
   static const editProduct = '/edit-product';

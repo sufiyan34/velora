@@ -9,9 +9,13 @@ class XPayService {
     required String customerName,
   }) async {
     if (session.publicKey == null ||
+        session.publicKey!.isEmpty ||
         session.accountId == null ||
+        session.accountId!.isEmpty ||
         session.clientSecret == null ||
-        session.encryptionKey == null) {
+        session.clientSecret!.isEmpty ||
+        session.encryptionKey == null ||
+        session.encryptionKey!.isEmpty) {
       return const PaymentResult.failed(
         message: 'XPay payment configuration is incomplete.',
       );
@@ -30,6 +34,8 @@ class XPayService {
     );
 
     return result ??
-        const PaymentResult.failed(message: 'Payment screen was closed.');
+        const PaymentResult.failed(
+          message: 'Payment screen was closed.',
+        );
   }
 }

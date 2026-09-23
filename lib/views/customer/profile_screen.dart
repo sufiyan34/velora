@@ -126,6 +126,14 @@ class ProfileScreen extends StatelessWidget {
                       Get.toNamed(AppRoutes.productReturn);
                     },
                   ),
+                  _profileTile(
+                    icon: Iconsax.message_question,
+                    title: 'My Complaints',
+                    subtitle: 'File or track a complaint',
+                    onTap: () {
+                      Get.toNamed(AppRoutes.complaint);
+                    },
+                  ),
                 ],
               ),
 

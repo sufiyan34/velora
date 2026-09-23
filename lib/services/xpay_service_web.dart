@@ -9,16 +9,24 @@ class XPayService {
     required String customerName,
   }) async {
     final url = session.checkoutUrl;
-    if (url == null || url.isEmpty) {
+
+    if (url == null || url.trim().isEmpty) {
       return const PaymentResult.failed(
-        message:
-            'XPay web needs the XPay Web SDK or a merchant-provided hosted checkout URL.',
+        message: 'XPay did not return a hosted checkout URL.',
+      );
+    }
+
+    final uri = Uri.tryParse(url);
+    if (uri == null || !uri.hasScheme) {
+      return const PaymentResult.failed(
+        message: 'The XPay checkout URL is invalid.',
       );
     }
 
     final launched = await launchUrl(
-      Uri.parse(url),
+      uri,
       mode: kIsWeb ? LaunchMode.platformDefault : LaunchMode.externalApplication,
+      webOnlyWindowName: '_self',
     );
 
     if (!launched) {
@@ -29,7 +37,8 @@ class XPayService {
 
     return PaymentResult.pending(
       transactionId: session.transactionId,
-      message: 'XPay checkout opened in the browser.',
+      message:
+          'XPay checkout opened. Your order will be marked paid after gateway verification.',
     );
   }
 }

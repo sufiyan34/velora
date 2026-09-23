@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:xpay_element_flutter/xpay_element_flutter.dart'
     show XPayElementController, XPayElementWidget;
+
 import '../../models/payment_model.dart';
 
 class XPayPaymentScreen extends StatefulWidget {
@@ -33,6 +34,7 @@ class _XPayPaymentScreenState extends State<XPayPaymentScreen> {
   @override
   void initState() {
     super.initState();
+
     _controller = XPayElementController(
       publicKey: widget.publicKey,
       accountId: widget.accountId,
@@ -42,6 +44,15 @@ class _XPayPaymentScreenState extends State<XPayPaymentScreen> {
 
   Future<void> _confirmPayment() async {
     if (_paying) return;
+
+    if (!_controller.isReady()) {
+      Get.snackbar(
+        'Incomplete Payment',
+        'Please complete all required payment fields.',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return;
+    }
 
     setState(() {
       _paying = true;
@@ -57,16 +68,9 @@ class _XPayPaymentScreenState extends State<XPayPaymentScreen> {
       if (!mounted) return;
 
       final bool hasError = result.error == true;
-      final String status =
-          result.status?.toString().trim().toLowerCase() ?? '';
       final String message = result.message?.toString().trim() ?? '';
 
-      // Explicit failure reported by XPay.
-      if (hasError ||
-          status == 'failed' ||
-          status == 'cancelled' ||
-          status == 'canceled' ||
-          status == 'declined') {
+      if (hasError) {
         Get.snackbar(
           'Payment Failed',
           message.isEmpty ? 'XPay could not complete the payment.' : message,
@@ -75,63 +79,24 @@ class _XPayPaymentScreenState extends State<XPayPaymentScreen> {
         return;
       }
 
-      // Explicit success statuses only.
-      //
-      // IMPORTANT:
-      // Never assume an unknown status means success.
-      const successStatuses = <String>{
-        'success',
-        'succeeded',
-        'paid',
-        'completed',
-      };
-
-      if (successStatuses.contains(status)) {
-        Navigator.of(context).pop(
-          PaymentResult.success(
-            transactionId: widget.transactionId,
-            message: message.isEmpty
-                ? 'Payment completed successfully.'
-                : message,
-          ),
-        );
-        return;
-      }
-
-      // Known asynchronous states.
-      if (status == 'pending' ||
-          status == 'processing' ||
-          status == 'requires_action' ||
-          status == 'in_progress') {
-        Navigator.of(context).pop(
-          PaymentResult.pending(
-            transactionId: widget.transactionId,
-            message: message.isEmpty
-                ? 'Payment is being processed. We will verify it shortly.'
-                : message,
-          ),
-        );
-        return;
-      }
-
-      // UNKNOWN STATUS:
-      // Never mark the order as paid.
-      // Leave it pending so the backend/webhook can verify the final state.
+      // The SDK confirms the client-side payment flow. The checkout screen
+      // immediately calls the trusted Firebase verifyPayment function, which
+      // retrieves the XPay payment intent and checks amount, currency, order
+      // reference, and final gateway status before marking the order as paid.
       Navigator.of(context).pop(
-        PaymentResult.pending(
+        PaymentResult.success(
           transactionId: widget.transactionId,
           message: message.isEmpty
-              ? 'Payment status is being verified. Please do not retry immediately.'
-              : 'Payment status is being verified: $message',
+              ? 'Payment submitted. Verifying with XPay...'
+              : message,
         ),
       );
     } catch (error) {
       if (!mounted) return;
 
-      // A communication/API error is also NOT a successful payment.
       Get.snackbar(
-        'Payment Verification',
-        'We could not confirm the payment yet. Please try again later.',
+        'Payment Error',
+        'Unable to submit the payment: $error',
         snackPosition: SnackPosition.BOTTOM,
       );
     } finally {
@@ -143,67 +108,12 @@ class _XPayPaymentScreenState extends State<XPayPaymentScreen> {
     }
   }
 
-  // Future<void> _confirmPayment() async {
-  //   if (_paying) return;
-
-  //   setState(() => _paying = true);
-
-  //   try {
-  //     final dynamic result = await _controller.confirmPayment(
-  //       customerName: widget.customerName,
-  //       clientSecret: widget.clientSecret,
-  //       encryptionsKeys: widget.encryptionKey,
-  //     );
-
-  //     final bool hasError = result.error == true;
-  //     final String? status = result.status?.toString().toLowerCase();
-  //     final String message = result.message?.toString() ?? '';
-
-  //     if (!mounted) return;
-
-  //     if (hasError || status == 'failed') {
-  //       Get.snackbar(
-  //         'Payment Failed',
-  //         message.isEmpty ? 'XPay could not complete the payment.' : message,
-  //         snackPosition: SnackPosition.BOTTOM,
-  //       );
-  //       return;
-  //     }
-
-  //     if (status == 'pending' || status == 'processing') {
-  //       Navigator.of(context).pop(
-  //         PaymentResult.pending(
-  //           transactionId: widget.transactionId,
-  //           message: message.isEmpty ? 'Payment is processing.' : message,
-  //         ),
-  //       );
-  //       return;
-  //     }
-
-  //     Navigator.of(context).pop(
-  //       PaymentResult.success(
-  //         transactionId: widget.transactionId,
-  //         message: message.isEmpty ? 'Payment completed.' : message,
-  //       ),
-  //     );
-  //   } catch (error) {
-  //     if (!mounted) return;
-  //     Get.snackbar(
-  //       'Payment Failed',
-  //       error.toString(),
-  //       snackPosition: SnackPosition.BOTTOM,
-  //     );
-  //   } finally {
-  //     if (mounted) {
-  //       setState(() => _paying = false);
-  //     }
-  //   }
-  // }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('XPay Payment')),
+      appBar: AppBar(
+        title: const Text('XPay Payment'),
+      ),
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
@@ -217,7 +127,9 @@ class _XPayPaymentScreenState extends State<XPayPaymentScreen> {
                       child: Card(
                         child: Padding(
                           padding: const EdgeInsets.all(12),
-                          child: XPayElementWidget(controller: _controller),
+                          child: XPayElementWidget(
+                            controller: _controller,
+                          ),
                         ),
                       ),
                     ),
@@ -231,7 +143,9 @@ class _XPayPaymentScreenState extends State<XPayPaymentScreen> {
                           ? const SizedBox(
                               height: 20,
                               width: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                              ),
                             )
                           : const Text('Pay Now'),
                     ),

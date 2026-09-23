@@ -3,6 +3,7 @@ import 'package:e_commerce/auth/admin_setup_screen.dart';
 import 'package:e_commerce/auth/login_screen.dart';
 import 'package:e_commerce/bindings/auth_binding.dart';
 import 'package:e_commerce/bindings/cart_binding.dart';
+import 'package:e_commerce/bindings/complaint_binding.dart';
 import 'package:e_commerce/bindings/customer_category_binding.dart';
 
 import 'package:e_commerce/bindings/customer_product_listing_binding.dart';
@@ -21,12 +22,14 @@ import 'package:e_commerce/splash_screen.dart';
 import 'package:e_commerce/testing/test_data_screen.dart';
 
 import 'package:e_commerce/views/admin/categories_screen.dart';
+import 'package:e_commerce/views/admin/complaints_screen.dart';
 import 'package:e_commerce/views/admin/dashboard_screen.dart';
 import 'package:e_commerce/views/admin/products_screen.dart';
 
 import 'package:e_commerce/views/customer/cart_screen.dart';
 import 'package:e_commerce/views/customer/categories_screen.dart';
 import 'package:e_commerce/views/customer/checkout_screen.dart';
+import 'package:e_commerce/views/customer/complaint_screen.dart';
 import 'package:e_commerce/views/customer/deals_screen.dart';
 import 'package:e_commerce/views/customer/home_page.dart';
 import 'package:e_commerce/views/customer/order_details_screen.dart';
@@ -206,6 +209,16 @@ class GetAppRoutes {
       binding: ReturnBinding(),
       middlewares: [PermissionMiddleware()],
     ),
+    // -------------------------------------------------------------------------
+    // COMPLAINTS
+    // Customer / Admin / Super Admin
+    // -------------------------------------------------------------------------
+    GetPage(
+      name: AppRoutes.complaint,
+      page: () => const ComplaintScreen(),
+      binding: ComplaintBinding(),
+      middlewares: [PermissionMiddleware()],
+    ),
     // =========================================================================
     // TEST / DEVELOPMENT
     // =========================================================================
@@ -256,6 +269,15 @@ class GetAppRoutes {
     GetPage(
       name: AppRoutes.adminOrders,
       page: () => const OrdersScreen(),
+      middlewares: [PermissionMiddleware()],
+    ),
+
+    // -------------------------------------------------------------------------
+    // ADMIN COMPLAINTS
+    // -------------------------------------------------------------------------
+    GetPage(
+      name: AppRoutes.adminComplaints,
+      page: () => const ComplaintsScreen(),
       middlewares: [PermissionMiddleware()],
     ),
   ];

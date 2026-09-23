@@ -1,5 +1,6 @@
 import 'package:e_commerce/constants/app_routes.dart';
 import 'package:e_commerce/controllers/auth_controller.dart';
+import 'package:e_commerce/testing/api_test.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
@@ -673,6 +674,13 @@ class _LoginScreenState extends State<LoginScreen>
       return;
     }
 
+    /// temperary trial purpose
+    /// remove this later
+    try {
+      await testCloudflareAuth();
+    } catch (e) {
+      print('Cloudflare test failed: $e');
+    }
     Get.offAllNamed(AppRoutes.home);
   }
 }
