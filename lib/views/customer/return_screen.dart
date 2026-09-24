@@ -335,7 +335,11 @@ class _OrderPickerTile extends GetView<ReturnController> {
               ),
               SizedBox(width: 8.w),
               if (eligible)
-                Icon(Iconsax.arrow_right_3, size: 16.sp, color: Colors.grey.shade400)
+                Icon(
+                  Iconsax.arrow_right_3,
+                  size: 16.sp,
+                  color: Colors.grey.shade400,
+                )
               else
                 Container(
                   padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 5.h),
@@ -586,7 +590,8 @@ class _ReturnItemRow extends GetView<ReturnController> {
   Widget build(BuildContext context) {
     return Obx(() {
       final selected = controller.isItemSelected(item.productId);
-      final quantity = controller.selectedQuantities[item.productId] ?? item.quantity;
+      final quantity =
+          controller.selectedQuantities[item.productId] ?? item.quantity;
 
       return Padding(
         padding: EdgeInsets.symmetric(vertical: 8.h),
@@ -609,13 +614,21 @@ class _ReturnItemRow extends GetView<ReturnController> {
                 ),
                 clipBehavior: Clip.antiAlias,
                 child: item.productImage.isEmpty
-                    ? Icon(Iconsax.image, size: 18.sp, color: Colors.grey.shade400)
+                    ? Icon(
+                        Iconsax.image,
+                        size: 18.sp,
+                        color: Colors.grey.shade400,
+                      )
                     : CachedNetworkImage(
                         imageUrl: item.productImage,
                         fit: BoxFit.cover,
-                        placeholder: (_, __) => Container(color: Colors.grey.shade100),
-                        errorWidget: (_, __, ___) =>
-                            Icon(Iconsax.image, size: 18.sp, color: Colors.grey.shade400),
+                        placeholder: (_, __) =>
+                            Container(color: Colors.grey.shade100),
+                        errorWidget: (_, __, ___) => Icon(
+                          Iconsax.image,
+                          size: 18.sp,
+                          color: Colors.grey.shade400,
+                        ),
                       ),
               ),
               SizedBox(width: 12.w),
@@ -741,13 +754,19 @@ class _ResolutionOption extends StatelessWidget {
           padding: EdgeInsets.symmetric(vertical: 12.h),
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: selected ? _accent.withValues(alpha: .1) : Colors.grey.shade100,
+            color: selected
+                ? _accent.withValues(alpha: .1)
+                : Colors.grey.shade100,
             borderRadius: BorderRadius.circular(12.r),
             border: Border.all(color: selected ? _accent : Colors.transparent),
           ),
           child: Column(
             children: [
-              Icon(icon, size: 18.sp, color: selected ? _accent : Colors.grey.shade600),
+              Icon(
+                icon,
+                size: 18.sp,
+                color: selected ? _accent : Colors.grey.shade600,
+              ),
               SizedBox(height: 5.h),
               Text(
                 label,
@@ -793,9 +812,13 @@ class _PhotoPicker extends GetView<ReturnController> {
                   child: CachedNetworkImage(
                     imageUrl: url,
                     fit: BoxFit.cover,
-                    placeholder: (_, __) => Container(color: Colors.grey.shade100),
-                    errorWidget: (_, __, ___) =>
-                        Icon(Iconsax.image, size: 18.sp, color: Colors.grey.shade400),
+                    placeholder: (_, __) =>
+                        Container(color: Colors.grey.shade100),
+                    errorWidget: (_, __, ___) => Icon(
+                      Iconsax.image,
+                      size: 18.sp,
+                      color: Colors.grey.shade400,
+                    ),
                   ),
                 ),
                 Positioned(
@@ -809,7 +832,11 @@ class _PhotoPicker extends GetView<ReturnController> {
                         color: Colors.black,
                         shape: BoxShape.circle,
                       ),
-                      child: Icon(Iconsax.close_circle, size: 12.sp, color: Colors.white),
+                      child: Icon(
+                        Iconsax.close_circle,
+                        size: 12.sp,
+                        color: Colors.white,
+                      ),
                     ),
                   ),
                 ),
@@ -836,10 +863,16 @@ class _PhotoPicker extends GetView<ReturnController> {
                         child: SizedBox(
                           width: 18.w,
                           height: 18.w,
-                          child: const CircularProgressIndicator(strokeWidth: 2),
+                          child: const CircularProgressIndicator(
+                            strokeWidth: 2,
+                          ),
                         ),
                       )
-                    : Icon(Iconsax.camera, size: 20.sp, color: Colors.grey.shade500),
+                    : Icon(
+                        Iconsax.camera,
+                        size: 20.sp,
+                        color: Colors.grey.shade500,
+                      ),
               ),
             ),
         ],
@@ -1158,6 +1191,40 @@ class _ReturnHistoryCard extends StatelessWidget {
               ),
             ],
           ),
+          if (request.adminNote != null &&
+              request.adminNote!.trim().isNotEmpty) ...[
+            SizedBox(height: 12.h),
+            Container(
+              width: double.infinity,
+              padding: EdgeInsets.all(12.w),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF4F2FC),
+                borderRadius: BorderRadius.circular(10.r),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Note from our team',
+                    style: GoogleFonts.poppins(
+                      fontSize: 10.sp,
+                      fontWeight: FontWeight.w700,
+                      color: _accent,
+                    ),
+                  ),
+                  SizedBox(height: 4.h),
+                  Text(
+                    request.adminNote!,
+                    style: GoogleFonts.poppins(
+                      fontSize: 11.5.sp,
+                      color: _ink,
+                      height: 1.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -1316,8 +1383,18 @@ class _ReturnSkeleton extends StatelessWidget {
 
 String _formatDate(DateTime date) {
   const months = [
-    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
   ];
 
   return '${months[date.month - 1]} ${date.day}, ${date.year}';

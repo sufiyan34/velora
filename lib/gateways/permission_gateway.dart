@@ -242,6 +242,7 @@ class PermissionGateway {
       case AppRoutes.adminProducts:
       case AppRoutes.addProduct:
       case AppRoutes.editProduct:
+      case AppRoutes.adminDeals:
         return AppPermission.manageProducts;
 
       case AppRoutes.adminCategories:

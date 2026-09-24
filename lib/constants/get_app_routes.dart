@@ -24,7 +24,10 @@ import 'package:e_commerce/testing/test_data_screen.dart';
 import 'package:e_commerce/views/admin/categories_screen.dart';
 import 'package:e_commerce/views/admin/complaints_screen.dart';
 import 'package:e_commerce/views/admin/dashboard_screen.dart';
+import 'package:e_commerce/views/admin/deals_screen.dart';
+import 'package:e_commerce/views/admin/inventory_screen.dart';
 import 'package:e_commerce/views/admin/products_screen.dart';
+import 'package:e_commerce/views/admin/returns_screen.dart';
 
 import 'package:e_commerce/views/customer/cart_screen.dart';
 import 'package:e_commerce/views/customer/categories_screen.dart';
@@ -278,6 +281,33 @@ class GetAppRoutes {
     GetPage(
       name: AppRoutes.adminComplaints,
       page: () => const ComplaintsScreen(),
+      middlewares: [PermissionMiddleware()],
+    ),
+
+    // -------------------------------------------------------------------------
+    // ADMIN INVENTORY
+    // -------------------------------------------------------------------------
+    GetPage(
+      name: AppRoutes.inventory,
+      page: () => const InventoryScreen(),
+      middlewares: [PermissionMiddleware()],
+    ),
+
+    // -------------------------------------------------------------------------
+    // ADMIN RETURNS
+    // -------------------------------------------------------------------------
+    GetPage(
+      name: AppRoutes.adminReturns,
+      page: () => const ReturnsScreen(),
+      middlewares: [PermissionMiddleware()],
+    ),
+
+    // -------------------------------------------------------------------------
+    // ADMIN DEALS
+    // -------------------------------------------------------------------------
+    GetPage(
+      name: AppRoutes.adminDeals,
+      page: () => const DealsScreen(),
       middlewares: [PermissionMiddleware()],
     ),
   ];

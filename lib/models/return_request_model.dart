@@ -205,6 +205,8 @@ class ReturnRequestModel {
   ReturnRequestModel copyWith({
     String? id,
     String? status,
+    String? adminNote,
+    bool clearAdminNote = false,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -218,7 +220,7 @@ class ReturnRequestModel {
       resolution: resolution,
       status: status ?? this.status,
       photoUrls: photoUrls,
-      adminNote: adminNote,
+      adminNote: clearAdminNote ? null : (adminNote ?? this.adminNote),
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
@@ -305,4 +307,20 @@ class ReturnReasons {
     'Better price found elsewhere',
     'Other',
   ];
+}
+
+// ============================================================
+// RETURN STATUSES
+// ============================================================
+
+class ReturnStatuses {
+  ReturnStatuses._();
+
+  static const pending = 'pending';
+  static const approved = 'approved';
+  static const rejected = 'rejected';
+  static const completed = 'completed';
+
+  /// Full lifecycle — used for status pickers and filter tabs.
+  static const all = <String>[pending, approved, rejected, completed];
 }

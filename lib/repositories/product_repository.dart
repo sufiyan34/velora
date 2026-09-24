@@ -106,6 +106,57 @@ class ProductRepository {
     await _productsRef.child(id).remove();
   }
 
+  /// Set a product's stock to an exact value — used by the Inventory screen
+  /// for manual counts/restocks.
+  Future<void> setStock({required String id, required int stock}) async {
+    await _productsRef.child(id).update({
+      'stock': stock < 0 ? 0 : stock,
+      'updatedAt': DateTime.now().toIso8601String(),
+    });
+  }
+
+  /// Nudge a product's stock up or down by [delta] using a transaction, so
+  /// two admins adjusting the same product at once don't clobber each
+  /// other's change. Returns the resulting stock level.
+  Future<int> adjustStock({required String id, required int delta}) async {
+    final stockRef = _productsRef.child(id).child('stock');
+
+    final result = await stockRef.runTransaction((currentData) {
+      final current = currentData is num ? currentData.toInt() : 0;
+      final next = current + delta;
+      return Transaction.success(next < 0 ? 0 : next);
+    });
+
+    await _productsRef
+        .child(id)
+        .child('updatedAt')
+        .set(DateTime.now().toIso8601String());
+
+    final value = result.snapshot.value;
+    return value is num ? value.toInt() : 0;
+  }
+
+  /// Put a product on sale (or change its sale price) — a "deal" in this
+  /// app is just a product with [ProductModel.isOnSale] set and a
+  /// [ProductModel.salePrice] below its regular price.
+  Future<void> setDeal({required String id, required double salePrice}) async {
+    await _productsRef.child(id).update({
+      'salePrice': salePrice,
+      'isOnSale': true,
+      'updatedAt': DateTime.now().toIso8601String(),
+    });
+  }
+
+  /// Take a product off sale. Passing `null` in an RTDB `.update()` removes
+  /// that key entirely, so this clears `salePrice` rather than zeroing it.
+  Future<void> clearDeal({required String id}) async {
+    await _productsRef.child(id).update({
+      'salePrice': null,
+      'isOnSale': false,
+      'updatedAt': DateTime.now().toIso8601String(),
+    });
+  }
+
   /// Get one product.
   Future<ProductModel?> getById(String id) async {
     final snapshot = await _productsRef.child(id).get();

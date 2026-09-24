@@ -34,11 +34,7 @@ class ReturnRepository {
 
     final now = DateTime.now();
 
-    final newRequest = request.copyWith(
-      id: id,
-      createdAt: now,
-      updatedAt: now,
-    );
+    final newRequest = request.copyWith(id: id, createdAt: now, updatedAt: now);
 
     // Save the complete request under:
     //
@@ -123,6 +119,52 @@ class ReturnRepository {
   }
 
   // ============================================================
+  // WATCH ALL RETURN REQUESTS (ADMIN)
+  // ============================================================
+
+  /// Live stream of every return request in the store, newest first. Used
+  /// by the admin Returns screen — the same role [watchAll] plays for
+  /// complaints and [AdminRepository.watchAllOrders] plays for orders.
+  Stream<List<ReturnRequestModel>> watchAll() {
+    return _returnsRef.onValue.map((event) {
+      final value = event.snapshot.value;
+
+      if (value is! Map) {
+        return <ReturnRequestModel>[];
+      }
+
+      final data = Map<String, dynamic>.from(value);
+      final requests = <ReturnRequestModel>[];
+
+      for (final entry in data.entries) {
+        final requestData = entry.value;
+
+        if (requestData is! Map) continue;
+
+        requests.add(
+          ReturnRequestModel.fromMap(
+            Map<String, dynamic>.from(requestData),
+            documentId: entry.key.toString(),
+          ),
+        );
+      }
+
+      requests.sort((a, b) {
+        final aDate = a.createdAt;
+        final bDate = b.createdAt;
+
+        if (aDate == null && bDate == null) return 0;
+        if (aDate == null) return 1;
+        if (bDate == null) return -1;
+
+        return bDate.compareTo(aDate);
+      });
+
+      return requests;
+    });
+  }
+
+  // ============================================================
   // GET SINGLE RETURN REQUEST
   // ============================================================
 
@@ -147,5 +189,61 @@ class ReturnRepository {
       Map<String, dynamic>.from(value),
       documentId: id,
     );
+  }
+
+  // ============================================================
+  // UPDATE STATUS (ADMIN)
+  // ============================================================
+
+  /// Moves a return request to a new [status] and optionally attaches
+  /// [adminNote] — shown back to the customer in their return history.
+  /// Also mirrors the status into the customer's lightweight reference and
+  /// onto the parent order's `returnStatus` flag.
+  Future<void> updateStatus({
+    required String id,
+    required String status,
+    String? adminNote,
+  }) async {
+    if (id.trim().isEmpty) {
+      throw Exception('Return request ID is required.');
+    }
+
+    final now = DateTime.now();
+
+    String? userId;
+    String? orderId;
+
+    final snapshot = await _returnsRef.child(id).get();
+    if (snapshot.exists && snapshot.value is Map) {
+      final data = Map<String, dynamic>.from(snapshot.value as Map);
+      userId = data['userId']?.toString();
+      orderId = data['orderId']?.toString();
+    }
+
+    final updates = <String, dynamic>{
+      'status': status,
+      'updatedAt': now.toIso8601String(),
+    };
+
+    if (adminNote != null) {
+      updates['adminNote'] = adminNote.trim().isEmpty ? null : adminNote.trim();
+    }
+
+    await _returnsRef.child(id).update(updates);
+
+    if (userId != null && userId.isNotEmpty) {
+      await _userReturnsRef(userId).child(id).update({
+        'status': status,
+        'updatedAt': now.toIso8601String(),
+      });
+    }
+
+    if (orderId != null && orderId.isNotEmpty) {
+      try {
+        await _ordersRef.child(orderId).update({'returnStatus': status});
+      } catch (_) {
+        // Non-fatal — the return request itself already saved.
+      }
+    }
   }
 }
